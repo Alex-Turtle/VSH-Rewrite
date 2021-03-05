@@ -81,18 +81,8 @@ const TFObjectMode TFObjectMode_Invalid = view_as<TFObjectMode>(-1);
 
 enum ClientFlags ( <<=1 )
 {
-	ClientFlags_BossTeam = 1,
-	ClientFlags_Admin,
+	ClientFlags_Admin = 1,
 	ClientFlags_Punishment,
-};
-
-enum Preferences ( <<=1 )
-{
-	Preferences_PickAsBoss = 1,
-	Preferences_Rank,
-	Preferences_MultiBoss,
-	Preferences_Music,
-	Preferences_Revival,
 };
 
 enum
@@ -1090,40 +1080,6 @@ void Frame_InitVshPreRoundTimer(int iTime)
 	event.Fire();
 }
 
-void Frame_VerifyTeam(int userid)
-{
-	int iClient = GetClientOfUserId(userid);
-	if (iClient <= 0 || !IsClientInGame(iClient)) return;
-
-	TFTeam nTeam = TF2_GetClientTeam(iClient);
-	if (nTeam <= TFTeam_Spectator) return;
-
-	if (Client_HasFlag(iClient, ClientFlags_BossTeam))
-	{
-		if (nTeam == TFTeam_Attack)	//Check if player is in attack team, if so put it back to boss team
-		{
-			TF2_ChangeClientTeam(iClient, TFTeam_Boss);
-			TF2_RespawnPlayer(iClient);
-		}
-	}
-	else
-	{
-		if (nTeam == TFTeam_Boss)		//Check if attack players is in boss team, if so put it back to attack team
-		{
-			TF2_ChangeClientTeam(iClient, TFTeam_Attack);
-			TF2_RespawnPlayer(iClient);
-		}
-	}
-}
-
-void Frame_RespawnPlayer(int userid)
-{
-	int iClient = GetClientOfUserId(userid);
-	if (iClient <= 0 || !IsClientInGame(iClient) || GetClientTeam(iClient) <= 1) return;
-	
-	TF2_RespawnPlayer(iClient);
-}
-
 public void Frame_CallJarate(DataPack data)
 {
 	data.Reset();
@@ -1189,7 +1145,7 @@ public Action Timer_Music(Handle hTimer, SaxtonHaleBase boss)
 			//Stop current music before playing another one
 			StopSound(iClient, SNDCHAN_AUTO, g_sBossMusic);
 			
-			if (Preferences_Get(iClient, Preferences_Music))
+			if (Preferences_Get(iClient, VSHPreferences_Music))
 				EmitSoundToClient(iClient, g_sBossMusic);
 		}
 	}
