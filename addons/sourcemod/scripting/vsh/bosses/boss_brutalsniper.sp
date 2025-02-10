@@ -7,7 +7,7 @@
 #define ITEM_BUSHWACKA		232
 #define ITEM_SHAHANSHAH		401
 
-static int g_iBrutalSniperWeaponCooldown[TF_MAXPLAYERS][BRUTALSNIPER_MAXWEAPONS];
+static int g_iBrutalSniperWeaponCooldown[MAXPLAYERS][BRUTALSNIPER_MAXWEAPONS];
 
 static char g_strBrutalSniperRoundStart[][] = {
 	"vo/sniper_specialweapon08.mp3"
@@ -120,7 +120,7 @@ public void BrutalSniper_OnSpawn(SaxtonHaleBase boss)
 	if (IsValidEntity(iWeapon)) 
 	{
 		SetEntProp(iWeapon, Prop_Send, "m_iClip1", 0);
-		SetEntProp(iClient, Prop_Send, "m_iAmmo", 0, _, 1);
+		TF2_SetAmmo(iClient, TF_AMMO_PRIMARY, 0);
 	}
 	/*
 	Huntsman attributes:
@@ -284,11 +284,11 @@ public void BrutalSniper_OnRage(SaxtonHaleBase boss)
 	int iPrimaryWep = GetPlayerWeaponSlot(iClient, WeaponSlot_Primary);
 	if (IsValidEntity(iPrimaryWep))
 	{
-		int iAmmo = GetEntProp(iClient, Prop_Send, "m_iAmmo", _, 1);
+		int iAmmo = TF2_GetAmmo(iClient, TF_AMMO_PRIMARY);
 		iAmmo += (1 + RoundToFloor(iPlayerCount / 4.0));
 		if (iAmmo > 6)
 			iAmmo = 6;
-		SetEntProp(iClient, Prop_Send, "m_iAmmo", iAmmo, _, 1);
+		TF2_SetAmmo(iClient, TF_AMMO_PRIMARY, iAmmo);
 		SetEntProp(iPrimaryWep, Prop_Send, "m_iClip1", 1);
 		SetEntPropEnt(iClient, Prop_Send, "m_hActiveWeapon", iPrimaryWep);
 	}
@@ -343,7 +343,7 @@ public void BrutalSniper_Precache(SaxtonHaleBase boss)
 {
 	PrecacheModel(BRUTALSNIPER_MODEL);
 	
-	PrepareSound(BRUTALSNIPER_THEME);
+	PrepareMusic(BRUTALSNIPER_THEME);
 	
 	for (int i = 0; i < sizeof(g_strBrutalSniperRoundStart); i++) PrecacheSound(g_strBrutalSniperRoundStart[i]);
 	for (int i = 0; i < sizeof(g_strBrutalSniperWin); i++) PrecacheSound(g_strBrutalSniperWin[i]);
@@ -365,7 +365,6 @@ public void BrutalSniper_Precache(SaxtonHaleBase boss)
 	
 	AddFileToDownloadsTable("models/player/saxton_hale/cbs_v4.mdl");
 	AddFileToDownloadsTable("models/player/saxton_hale/cbs_v4.phy");
-	AddFileToDownloadsTable("models/player/saxton_hale/cbs_v4.sw.vtx");
 	AddFileToDownloadsTable("models/player/saxton_hale/cbs_v4.vvd");
 	AddFileToDownloadsTable("models/player/saxton_hale/cbs_v4.dx80.vtx");
 	AddFileToDownloadsTable("models/player/saxton_hale/cbs_v4.dx90.vtx");

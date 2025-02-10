@@ -1,5 +1,5 @@
-static float g_flTeleportSwapCooldownWait[TF_MAXPLAYERS];
-static bool g_bTeleportSwapHoldingChargeButton[TF_MAXPLAYERS];
+static float g_flTeleportSwapCooldownWait[MAXPLAYERS];
+static bool g_bTeleportSwapHoldingChargeButton[MAXPLAYERS];
 
 public void TeleportSwap_Create(SaxtonHaleBase boss)
 {
@@ -49,11 +49,11 @@ public void TeleportSwap_GetHudInfo(SaxtonHaleBase boss, char[] sMessage, int iL
 	if (g_flTeleportSwapCooldownWait[boss.iClient] != 0.0 && g_flTeleportSwapCooldownWait[boss.iClient] > GetGameTime())
 	{
 		int iSec = RoundToCeil(g_flTeleportSwapCooldownWait[boss.iClient]-GetGameTime());
-		Format(sMessage, iLength, "%s\nTeleport-swap cooldown %i second%s remaining!", sMessage, iSec, (iSec > 1) ? "s" : "");
+		Format(sMessage, iLength, "%s\nTeleport-swap is on cooldown for %d second%s!", sMessage, iSec, (iSec > 1) ? "s" : "");
 	}
 	else if (boss.GetPropInt("TeleportSwap", "Charge") > 0)
 	{
-		Format(sMessage, iLength, "%s\nTeleport-swap: %0.2f%%. Look up and stand up to use teleport-swap.", sMessage, (float(boss.GetPropInt("TeleportSwap", "Charge"))/float(boss.GetPropInt("TeleportSwap", "MaxCharge")))*100.0);
+		Format(sMessage, iLength, "%s\nTeleport-swap: %.0f％. Look up and release right click to teleport.", sMessage, (float(boss.GetPropInt("TeleportSwap", "Charge"))/float(boss.GetPropInt("TeleportSwap", "MaxCharge")))*100.0);
 	}
 	else
 	{
@@ -71,13 +71,8 @@ public void TeleportSwap_OnButtonRelease(SaxtonHaleBase boss, int button)
 {
 	if (button == IN_ATTACK2)
 	{
-		if (TF2_IsPlayerInCondition(boss.iClient, TFCond_Dazed))//Can't teleport-swap if stunned
-			return;
-		
-		if (!(GetEntityFlags(boss.iClient) & FL_ONGROUND))
-			return;
-		
 		g_bTeleportSwapHoldingChargeButton[boss.iClient] = false;
+		
 		if (g_flTeleportSwapCooldownWait[boss.iClient] > GetGameTime()) return;
 		
 		float vecAng[3];
@@ -85,7 +80,28 @@ public void TeleportSwap_OnButtonRelease(SaxtonHaleBase boss, int button)
 		
 		if ((vecAng[0] <= boss.GetPropFloat("TeleportSwap", "EyeAngleRequirement")) && (boss.GetPropInt("TeleportSwap", "Charge") >= boss.GetPropInt("TeleportSwap", "MaxCharge")))
 		{
-			//get random valid attack player
+			// Deny teleporting when stunned
+			if (TF2_IsPlayerInCondition(boss.iClient, TFCond_Dazed))
+			{
+				PrintHintText(boss.iClient, "Can't teleport-swap when stunned.");
+				return;
+			}
+			
+			// Deny teleporting when airborne
+			if (!(GetEntityFlags(boss.iClient) & FL_ONGROUND))
+			{
+				PrintHintText(boss.iClient, "Can't teleport-swap when airborne.");
+				return;
+			}
+			
+			// Deny teleporting when out of the dome
+			if (Dome_IsEntityOutside(boss.iClient))
+			{
+				PrintHintText(boss.iClient, "Can't teleport-swap when outside of the dome.");
+				return;
+			}
+			
+			// Get a list of valid attackers
 			ArrayList aClients = new ArrayList();
 			for (int i = 1; i <= MaxClients; i++)
 				if (SaxtonHale_IsValidAttack(i) && IsPlayerAlive(i))
@@ -100,11 +116,28 @@ public void TeleportSwap_OnButtonRelease(SaxtonHaleBase boss, int button)
 			
 			aClients.Sort(Sort_Random, Sort_Integer);
 			
+			// Avoid teleporting to potential targets who are out of the dome
 			int iClient[2];
-			
 			iClient[0] = boss.iClient;
-			iClient[1] = aClients.Get(0);
+			
+			for (int i = 0; i < aClients.Length; i++)
+			{
+				int iTarget = aClients.Get(i);
+				if (Dome_IsEntityOutside(iTarget))
+					continue;
+				
+				iClient[1] = iTarget;
+				break;
+			}
+			
 			delete aClients;
+			
+			// Deny teleporting if every target found is out of the dome
+			if (!iClient[1])
+			{
+				PrintHintText(boss.iClient, "Can't teleport-swap, all possible targets are outside of the dome.");
+				return;
+			}
 			
 			TF2_TeleportSwap(iClient);
 			

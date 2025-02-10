@@ -189,9 +189,13 @@ public void Event_RoundArenaStart(Event event, const char[] sName, bool bDontBro
 				boss.CallFunction("GetMusicInfo", g_sBossMusic, sizeof(g_sBossMusic), flMusicTime);
 				if (!StrEmpty(g_sBossMusic))
 				{
+					// Prefix the filepath with #, so it's considered as music by the engine, allowing people to adjust its volume through the music volume slider
+					if (g_sBossMusic[0] != '#')
+						Format(g_sBossMusic, sizeof(g_sBossMusic), "#%s", g_sBossMusic);
+					
 					for (int i = 1; i <= MaxClients; i++)
 						if (IsClientInGame(i) && Preferences_Get(i, VSHPreferences_Music))
-							EmitSoundToClient(i, g_sBossMusic);
+							EmitSoundToClient(i, g_sBossMusic, _, SNDCHAN_STATIC, SNDLEVEL_NONE);
 					
 					if (flMusicTime > 0.0)
 						g_hTimerBossMusic = CreateTimer(flMusicTime, Timer_Music, boss, TIMER_REPEAT);
@@ -337,9 +341,14 @@ public void Event_RoundEnd(Event event, const char[] sName, bool bDontBroadcast)
 		{
 			//End music
 			if (!StrEmpty(g_sBossMusic))
-				StopSound(iClient, SNDCHAN_AUTO, g_sBossMusic);
+				StopSound(iClient, SNDCHAN_STATIC, g_sBossMusic);
 			
-			if (GetClientTeam(iClient) > 1 && (!SaxtonHale_IsValidBoss(iClient, false)))
+			if (SaxtonHale_IsValidBoss(iClient, false))
+			{
+				//Clean up now to avoid stray particles
+				ClearBossEffects(iClient);
+			}
+			else if (GetClientTeam(iClient) > 1)
 			{				
 				aPlayersList.Push(iClient);
 				
@@ -418,7 +427,7 @@ public void Event_RoundEnd(Event event, const char[] sName, bool bDontBroadcast)
 			boss.CallFunction("GetBossName", sBuffer, sizeof(sBuffer));
 			
 			//Format with health
-			if (IsPlayerAlive(iClient))
+			if (IsPlayerAlive(iClient) && boss.iHealth > 0)
 				Format(sMessage, sizeof(sMessage), "%s %s had %d of %d HP left", sMessage, sBuffer, boss.iHealth, boss.iMaxHealth);
 			else
 				Format(sMessage, sizeof(sMessage), "%s %s died with %d max HP", sMessage, sBuffer, boss.iMaxHealth);

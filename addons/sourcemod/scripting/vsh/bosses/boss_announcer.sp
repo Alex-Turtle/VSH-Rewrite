@@ -98,7 +98,7 @@ public void Announcer_OnSpawn(SaxtonHaleBase boss)
 	if (iWeapon > MaxClients)
 	{
 		SetEntProp(iWeapon, Prop_Send, "m_iClip1", 0);
-		SetEntProp(iClient, Prop_Send, "m_iAmmo", 0, _, 2);
+		TF2_SetAmmo(iClient, TF_AMMO_SECONDARY, 0);
 	}
 	/*
 	Diamondback attributes:
@@ -173,7 +173,7 @@ public void Announcer_OnRage(SaxtonHaleBase boss)
 		if (iClip > 8) iClip = 8;
 		
 		SetEntProp(iPrimaryWep, Prop_Send, "m_iClip1", iClip);
-		SetEntPropEnt(boss.iClient, Prop_Send, "m_hActiveWeapon", iPrimaryWep);
+		TF2_SwitchToWeapon(boss.iClient, iPrimaryWep);
 	}
 }
 
@@ -242,7 +242,7 @@ public void Announcer_Precache(SaxtonHaleBase boss)
 {
 	PrecacheModel(ANNOUNCER_MODEL);
 	
-	PrepareSound(ANNOUNCER_THEME);
+	PrepareMusic(ANNOUNCER_THEME);
 	
 	for (int i = 0; i < sizeof(g_strAnnouncerRoundStart); i++) PrecacheSound(g_strAnnouncerRoundStart[i]);
 	for (int i = 0; i < sizeof(g_strAnnouncerWin); i++) PrecacheSound(g_strAnnouncerWin[i]);
@@ -272,18 +272,16 @@ public void Announcer_Precache(SaxtonHaleBase boss)
 	AddFileToDownloadsTable("models/player/kirillian/boss/sedisocks_administrator.dx90.vtx");
 	AddFileToDownloadsTable("models/player/kirillian/boss/sedisocks_administrator.mdl");
 	AddFileToDownloadsTable("models/player/kirillian/boss/sedisocks_administrator.phy");
-	AddFileToDownloadsTable("models/player/kirillian/boss/sedisocks_administrator.sw.vtx");
 	AddFileToDownloadsTable("models/player/kirillian/boss/sedisocks_administrator.vvd");
 }
 
-static Handle g_hAnnouncerMinionTimer[TF_MAXPLAYERS];
-static int g_iAnnouncerMinionTimeLeft[TF_MAXPLAYERS];
+static Handle g_hAnnouncerMinionTimer[MAXPLAYERS];
+static int g_iAnnouncerMinionTimeLeft[MAXPLAYERS];
 
 public void AnnouncerMinion_Create(SaxtonHaleBase boss)
 {
 	boss.flSpeed = -1.0;
 	boss.iMaxRageDamage = -1;
-	boss.flWeighDownTimer = -1.0;
 	boss.bMinion = true;
 	boss.bModel = false;
 	
@@ -374,6 +372,12 @@ public void AnnouncerMinion_OnPlayerKilled(SaxtonHaleBase boss, Event eventInfo,
 	}
 }
 
+public void AnnouncerMinion_OnPickupTouch(SaxtonHaleBase boss, int iEntity, bool &bResult)
+{
+	// Allow minions to pick up healthkits/ammopacks
+	bResult = true;
+}
+
 public void AnnouncerMinion_Destroy(SaxtonHaleBase boss)
 {
 	g_hAnnouncerMinionTimer[boss.iClient] = null;
@@ -450,6 +454,19 @@ public Action Timer_AnnouncerChangeTeam(Handle hTimer, int iClient)
 	//Refill health
 	SetEntProp(iClient, Prop_Send, "m_iHealth", SDK_GetMaxHealth(iClient));
 	
+	//Refill ammo (jank)
+	int iAmmoPack = CreateEntityByName("item_ammopack_full");
+	SetEntityOwner(iAmmoPack, iClient);
+	SDKHook(iAmmoPack, SDKHook_Touch, AnnouncerMinion_OnRageAmmoPackTouch);
+	
+	DispatchSpawn(iAmmoPack);
+	SetEntityRenderMode(iAmmoPack, RENDER_NONE);
+	
+	float vecClientPos[3];
+	GetClientAbsOrigin(iClient, vecClientPos);
+	TeleportEntity(iAmmoPack, vecClientPos, NULL_VECTOR, NULL_VECTOR);
+	CreateTimer(0.1, Timer_EntityCleanup, EntIndexToEntRef(iAmmoPack));
+	
 	//Allow sentries to target this fella from now on
 	SetEntityFlags(iClient, (GetEntityFlags(iClient) & ~FL_NOTARGET));
 	
@@ -478,4 +495,13 @@ public void Announcer_ShowAnnotation(int iTarget, char[] sMessage, float flDurat
 		return;
 	
 	TF2_ShowAnnotation(iClients, iCount, iTarget, sMessage, flDuration);
+}
+
+Action AnnouncerMinion_OnRageAmmoPackTouch(int iEntity, int iClient)
+{
+	int iOwner = GetEntPropEnt(iEntity, Prop_Send, "m_hOwnerEntity");
+	if (iClient != iOwner)
+		return Plugin_Handled;
+	
+	return Plugin_Continue;
 }

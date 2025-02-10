@@ -332,20 +332,6 @@ methodmap SaxtonHaleBase
 		public native set(float val);
 	}
 	
-	// Retrieve/Set timer while in air to allow weighdown, -1.0 to disable weighdown
-	property float flWeighDownTimer
-	{
-		public native get();
-		public native set(float val);
-	}
-	
-	// Retrieve/Set weighdown force
-	property float flWeighDownForce
-	{
-		public native get();
-		public native set(float val);
-	}
-	
 	// Retrieve/Set time remaining for glow to end in seconds, 0.0 for no glow, -1.0 for permanent 
 	property float flGlowTime
 	{
@@ -837,6 +823,31 @@ stock void SaxtonHale_PrepareSound(const char[] sSound)
 }
 
 /**
+ * Precaches a sound and adds music volume compatibility
+ *
+ * @param sSound			Sound to precache
+ * @param bCustom			Should the sound be added to the downloads table?
+ */
+stock void SaxtonHale_PrepareMusic(const char[] sSound, bool bCustom = true)
+{
+	// Prefix the filepath with #, so it's considered as music by the engine, allowing people to adjust its volume through the music volume slider
+	char sBuffer[PLATFORM_MAX_PATH];
+	FormatEx(sBuffer, sizeof(sBuffer), "#%s", sSound);
+	PrecacheSound(sBuffer, true);
+	
+	if (!bCustom)
+		return;
+	
+	if (ReplaceString(sBuffer, sizeof(sBuffer), "#", "sound/") != 1)
+	{
+		LogError("PrepareMusic could not prepare %s: filepath must not have any '#' characters.", sSound);
+		return;
+	}
+	
+	AddFileToDownloadsTable(sBuffer);
+}
+
+/**
  * Deprecated functions, do not use
  */
 
@@ -893,10 +904,6 @@ public __pl_saxtonhale_SetNTVOptional()
 	MarkNativeAsOptional("SaxtonHaleBase.flSpeedMult.set");
 	MarkNativeAsOptional("SaxtonHaleBase.flEnvDamageCap.get");
 	MarkNativeAsOptional("SaxtonHaleBase.flEnvDamageCap.set");
-	MarkNativeAsOptional("SaxtonHaleBase.flWeighDownTimer.get");
-	MarkNativeAsOptional("SaxtonHaleBase.flWeighDownTimer.set");
-	MarkNativeAsOptional("SaxtonHaleBase.flWeighDownForce.get");
-	MarkNativeAsOptional("SaxtonHaleBase.flWeighDownForce.set");
 	MarkNativeAsOptional("SaxtonHaleBase.flGlowTime.get");
 	MarkNativeAsOptional("SaxtonHaleBase.flGlowTime.set");
 	MarkNativeAsOptional("SaxtonHaleBase.flRageLastTime.get");

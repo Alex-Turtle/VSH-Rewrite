@@ -10,9 +10,11 @@ enum TagsFilterType			//List of possible filters
 	TagsFilterType_DamageMinimum,
 	TagsFilterType_DamageType,
 	TagsFilterType_DamageCustom,
+	TagsFilterType_HitFromBehind,
 	TagsFilterType_BackstabCount,
 	TagsFilterType_FeignDeath,
 	TagsFilterType_VictimUber,
+	TagsFilterType_SelfDamage,
 }
 
 enum struct TagsFilterStruct
@@ -26,7 +28,7 @@ enum struct TagsFilterStruct
 		
 		switch (this.nType)
 		{
-			case TagsFilterType_Cond, TagsFilterType_BackstabCount, TagsFilterType_DamageMaximum, TagsFilterType_DamageMinimum:
+			case TagsFilterType_Cond, TagsFilterType_HitFromBehind, TagsFilterType_BackstabCount, TagsFilterType_DamageMaximum, TagsFilterType_DamageMinimum:
 			{
 				//Get number from string
 				return !!StringToIntEx(sValue, this.nValue);
@@ -37,7 +39,7 @@ enum struct TagsFilterStruct
 				this.nValue = TagsTarget_GetType(sValue);
 				return !(this.nValue == TagsTarget_Invalid);
 			}
-			case TagsFilterType_Aim, TagsFilterType_SentryTarget, TagsFilterType_FeignDeath, TagsFilterType_VictimUber:
+			case TagsFilterType_Aim, TagsFilterType_SentryTarget, TagsFilterType_FeignDeath, TagsFilterType_VictimUber, TagsFilterType_SelfDamage:
 			{
 				this.nValue = !!StringToInt(sValue);	//Turn into boolean
 				return true;
@@ -117,6 +119,27 @@ enum struct TagsFilterStruct
 				else if (this.nValue < 0)
 					return !(iDamageCustom == -this.nValue);
 			}
+			case TagsFilterType_HitFromBehind:
+			{
+				// This mimics the closerange_backattack_minicrits attribute's functionality
+				int iVictim = tParams.GetInt("victim");
+				float vecClientPos[3], vecVictimPos[3];
+				GetClientAbsOrigin(iClient, vecClientPos);
+				GetClientAbsOrigin(iVictim, vecVictimPos);
+				
+				if (this.nValue > 0 && GetVectorDistance(vecClientPos, vecVictimPos, false) > float(this.nValue))
+					return false;
+				
+				float vecVictimAng[3], vecBuffer[3], vecForward[3];
+				SubtractVectors(vecVictimPos, vecClientPos, vecBuffer);
+				
+				GetClientEyeAngles(iVictim, vecVictimAng);
+				GetAngleVectors(vecVictimAng, vecForward, NULL_VECTOR, NULL_VECTOR);
+				vecBuffer[2] = 0.0;
+				NormalizeVector(vecBuffer, vecBuffer);
+				
+				return GetVectorDotProduct(vecBuffer, vecForward) > 0.259;
+			}
 			case TagsFilterType_BackstabCount:
 			{
 				return Tags_GetBackstabCount(iClient, tParams.GetInt("victim")) >= this.nValue;
@@ -147,6 +170,13 @@ enum struct TagsFilterStruct
 					return false;
 				
 				return iDamage >= this.nValue;
+			}
+			case TagsFilterType_SelfDamage:
+			{
+				int iVictim = tParams.GetInt("victim");
+				int iAttacker = tParams.GetInt("attacker", -1);
+				bool bSelf = (iVictim == iAttacker);
+				return (this.nValue ? bSelf : !bSelf);
 			}
 		}
 		
@@ -226,9 +256,11 @@ TagsFilterType TagsFilter_GetType(const char[] sTarget)
 		mFilterType.SetValue("sentrytarget", TagsFilterType_SentryTarget);
 		mFilterType.SetValue("damagetype", TagsFilterType_DamageType);
 		mFilterType.SetValue("damagecustom", TagsFilterType_DamageCustom);
+		mFilterType.SetValue("hitfrombehind", TagsFilterType_HitFromBehind);
 		mFilterType.SetValue("backstabcount", TagsFilterType_BackstabCount);
 		mFilterType.SetValue("feigndeath", TagsFilterType_FeignDeath);
 		mFilterType.SetValue("victimuber", TagsFilterType_VictimUber);
+		mFilterType.SetValue("selfdamage", TagsFilterType_SelfDamage);
 	}
 	
 	TagsFilterType nFilterType = TagsFilterType_Invalid;

@@ -1,5 +1,3 @@
-#define ATTRIB_LESSHEALING				734
-
 stock void Client_AddHealth(int iClient, int iAdditionalHeal, int iMaxOverHeal=0)
 {
 	int iMaxHealth = SDK_GetMaxHealth(iClient);
@@ -49,6 +47,11 @@ stock bool IsPointsClear(const float vecPos1[3], const float vecPos2[3])
 {
 	TR_TraceRayFilter(vecPos1, vecPos2, MASK_PLAYERSOLID, RayType_EndPoint, TraceRay_DontHitPlayersAndObjects);
 	return !TR_DidHit();
+}
+
+stock bool TraceRay_HitWallOnly(int iEntity, int iMask, int iData)
+{
+	return false;
 }
 
 stock bool TraceRay_DontHitEntity(int iEntity, int iMask, int iData)
@@ -421,28 +424,14 @@ stock void TF2_CheckClientWeapons(int iClient)
 	}
 }
 
-stock int TF2_GetAmmo(int iClient, int iSlot)
+stock int TF2_GetAmmo(int iClient, int iAmmoType)
 {
-	int iWeapon = GetPlayerWeaponSlot(iClient, iSlot);
-	if (iWeapon > MaxClients)
-	{
-		int iAmmoType = GetEntProp(iWeapon, Prop_Send, "m_iPrimaryAmmoType");
-		if (iAmmoType > -1)
-			return GetEntProp(iClient, Prop_Send, "m_iAmmo", _, iAmmoType);
-	}
-	
-	return -1;
+	return GetEntProp(iClient, Prop_Send, "m_iAmmo", _, iAmmoType);
 }
 
-stock void TF2_SetAmmo(int iClient, int iSlot, int iAmmo)
+stock void TF2_SetAmmo(int iClient, int iAmmoType, int iAmmo)
 {
-	int iWeapon = GetPlayerWeaponSlot(iClient, iSlot);
-	if (iWeapon > MaxClients)
-	{
-		int iAmmoType = GetEntProp(iWeapon, Prop_Send, "m_iPrimaryAmmoType");
-		if (iAmmoType > -1)
-			SetEntProp(iClient, Prop_Send, "m_iAmmo", iAmmo, _, iAmmoType);
-	}
+	SetEntProp(iClient, Prop_Send, "m_iAmmo", iAmmo, _, iAmmoType);
 }
 
 stock int TF2_GetPatient(int iClient)
@@ -619,12 +608,16 @@ stock int TF2_CreateAndEquipWeapon(int iClient, int iIndex, char[] sClassnameTem
 			EquipPlayerWeapon(iClient, iWeapon);
 			
 			//Make sure max ammo is set correctly
-			int iSlot = TF2_GetItemSlot(iIndex, TF2_GetPlayerClass(iClient));
-			int iMaxAmmo = SDK_GetMaxAmmo(iClient, iSlot);
 			int iAmmoType = GetEntProp(iWeapon, Prop_Send, "m_iPrimaryAmmoType");
+			if (iAmmoType > -1)
+			{
+				TF2_SetAmmo(iClient, iAmmoType, 0);
+				GivePlayerAmmo(iClient, 9999, iAmmoType, true);
+			}
 			
-			if (iMaxAmmo > 0 && iAmmoType > -1)
-				SetEntProp(iClient, Prop_Send, "m_iAmmo", iMaxAmmo, 4, iAmmoType);
+			int iExtraWearable = GetEntPropEnt(iWeapon, Prop_Send, "m_hExtraWearable");
+			if (iExtraWearable != INVALID_ENT_REFERENCE)
+				SetEntProp(iExtraWearable, Prop_Send, "m_bValidatedAttachedEntity", true);
 		}
 		
 		char atts[32][32];
@@ -724,10 +717,10 @@ stock void TF2_Shake(float vecOrigin[3], float flAmplitude, float flRadius, floa
 	}
 }
 
-stock int TF2_SpawnParticle(char[] sParticle, float vecOrigin[3] = NULL_VECTOR, float flAngles[3] = NULL_VECTOR, bool bActivate = true, int iEntity = 0, int iControlPoint = 0)
+stock int TF2_SpawnParticle(char[] sParticle, float vecOrigin[3] = NULL_VECTOR, float vecAngles[3] = NULL_VECTOR, bool bActivate = true, int iEntity = 0, int iControlPoint = 0, const char[] sAttachment = "", const char[] sAttachmentOffset = "")
 {
 	int iParticle = CreateEntityByName("info_particle_system");
-	TeleportEntity(iParticle, vecOrigin, flAngles, NULL_VECTOR);
+	TeleportEntity(iParticle, vecOrigin, vecAngles, NULL_VECTOR);
 	DispatchKeyValue(iParticle, "effect_name", sParticle);
 	DispatchSpawn(iParticle);
 	
@@ -735,6 +728,18 @@ stock int TF2_SpawnParticle(char[] sParticle, float vecOrigin[3] = NULL_VECTOR, 
 	{
 		SetVariantString("!activator");
 		AcceptEntityInput(iParticle, "SetParent", iEntity);
+
+		if (sAttachment[0])
+		{
+			SetVariantString(sAttachment);
+			AcceptEntityInput(iParticle, "SetParentAttachment", iParticle);
+		}
+		
+		if (sAttachmentOffset[0])
+		{
+			SetVariantString(sAttachmentOffset);
+			AcceptEntityInput(iParticle, "SetParentAttachmentMaintainOffset", iParticle);
+		}
 	}
 	
 	if (0 < iControlPoint && IsValidEntity(iControlPoint))
@@ -752,6 +757,64 @@ stock int TF2_SpawnParticle(char[] sParticle, float vecOrigin[3] = NULL_VECTOR, 
 	
 	//Return ref of entity
 	return EntIndexToEntRef(iParticle);
+}
+
+stock int TF2_AttachParticle(char[] sParticle, int iClient)
+{
+	char model[PLATFORM_MAX_PATH];
+	GetClientModel(iClient, model, sizeof(model));
+
+	int iProp = CreateEntityByName("tf_taunt_prop");
+	DispatchSpawn(iProp);
+	ActivateEntity(iProp);
+	SetEntityModel(iProp, model);
+	
+	SetEntityRenderColor(iProp, 0, 0, 0, 0);
+	SetEntityRenderMode(iProp, RENDER_TRANSALPHA);
+
+	SetEntProp(iProp, Prop_Send, "m_fEffects", GetEntProp(iProp, Prop_Send, "m_fEffects")|EF_BONEMERGE|EF_NOSHADOW|EF_NORECEIVESHADOW);
+	SetEntPropEnt(iProp, Prop_Data, "m_hEffectEntity", iClient);
+
+	SetVariantString("!activator");
+	AcceptEntityInput(iProp, "SetParent", iClient);
+
+	// find string table
+	int iTable = FindStringTable("ParticleEffectNames");
+	if (iTable != INVALID_STRING_TABLE)
+	{
+		// find particle index
+		char sBuffer[256];
+		int iCount = GetStringTableNumStrings(iTable);
+		int iIndex = INVALID_STRING_INDEX;
+		for (int i; i < iCount; i++)
+		{
+			ReadStringTable(iTable, i, sBuffer, sizeof(sBuffer));
+			if(StrEqual(sBuffer, sParticle, false))
+			{
+				iIndex = i;
+				break;
+			}
+		}
+
+		if (iIndex != INVALID_STRING_INDEX)
+		{
+			TE_Start("TFParticleEffect");
+			TE_WriteFloat("m_vecOrigin[0]", 100000.0);
+			TE_WriteFloat("m_vecOrigin[1]", 100000.0);
+			TE_WriteFloat("m_vecOrigin[2]", 100000.0);
+			TE_WriteNum("m_iParticleSystemIndex", iIndex);
+
+			TE_WriteNum("entindex", iProp);
+			TE_WriteNum("m_iAttachType", -1);
+			TE_WriteNum("m_iAttachmentPointIndex", 6);
+			TE_WriteNum("m_bResetParticles", false);
+
+			TE_SendToAll(0.0);
+		}
+	}
+
+	//Return ref of entity
+	return EntIndexToEntRef(iProp);
 }
 
 stock void TF2_TeleportToClient(int iClient, int iTarget)
@@ -797,6 +860,9 @@ stock void TF2_TeleportSwap(int iClient[2])
 		
 		//Create particle
 		CreateTimer(3.0, Timer_EntityCleanup, TF2_SpawnParticle(PARTICLE_GHOST, vecOrigin[i], vecAngles[i]));
+		
+		//Play a sound
+		EmitGameSoundToAll("Halloween.spell_teleport", iClient[i]);
 	}
 	
 	for (int i = 0; i <= 1; i++)
@@ -963,6 +1029,25 @@ stock void PrepareSound(const char[] sSoundPath)
 	AddFileToDownloadsTable(s);
 }
 
+stock void PrepareMusic(const char[] sSoundPath, bool bCustom = true)
+{
+	// Prefix the filepath with #, so it's considered as music by the engine, allowing people to adjust its volume through the music volume slider
+	char s[PLATFORM_MAX_PATH];
+	FormatEx(s, sizeof(s), "#%s", sSoundPath);
+	PrecacheSound(s, true);
+	
+	if (!bCustom)
+		return;
+	
+	if (ReplaceString(s, sizeof(s), "#", "sound/") != 1)
+	{
+		LogError("PrepareMusic could not prepare %s: filepath must not have any '#' characters.", sSoundPath);
+		return;
+	}
+	
+	AddFileToDownloadsTable(s);
+}
+
 stock int PrecacheParticleSystem(const char[] particleSystem)
 {
 	static int particleEffectNames = INVALID_STRING_TABLE;
@@ -1024,4 +1109,15 @@ stock void CreateFade(int iClient, int iDuration = 2000, int iRed = 255, int iGr
 	bf.WriteByte(iBlue);		//Blue
 	bf.WriteByte(iAlpha);		//Alpha
 	EndMessage();
+}
+
+stock void ConstrainDistance(const float vecStart[3], float vecEnd[3], float flDistance, float flMaxDistance)
+{
+	if (flDistance <= flMaxDistance)
+		return;
+		
+	float flFactor = flMaxDistance / flDistance;
+	vecEnd[0] = ((vecEnd[0] - vecStart[0]) * flFactor) + vecStart[0];
+	vecEnd[1] = ((vecEnd[1] - vecStart[1]) * flFactor) + vecStart[1];
+	vecEnd[2] = ((vecEnd[2] - vecStart[2]) * flFactor) + vecStart[2];
 }

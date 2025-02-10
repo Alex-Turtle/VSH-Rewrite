@@ -3,7 +3,7 @@
 #define VAMPIRE_LOSS	0.002	//Per second
 
 static int g_iVampireCount = 0;
-static float g_flVampireHealthDrainBuffer[TF_MAXPLAYERS];
+static float g_flVampireHealthDrainBuffer[MAXPLAYERS];
 
 public void ModifiersVampire_Create(SaxtonHaleBase boss)
 {
@@ -33,6 +33,18 @@ public void ModifiersVampire_GetRenderColor(SaxtonHaleBase boss, int iColor[4])
 	iColor[1] = 96;
 	iColor[2] = 255;
 	iColor[3] = 255;
+}
+
+public void ModifiersVampire_GetParticleEffect(SaxtonHaleBase boss, int index, char[] sEffect, int length)
+{
+	switch (index)
+	{
+		case 0:
+			strcopy(sEffect, length, "utaunt_hellpit_bats");
+		
+		case 1:
+			strcopy(sEffect, length, "player_intel_trail_red");
+	}
 }
 
 public void ModifiersVampire_OnThink(SaxtonHaleBase boss)

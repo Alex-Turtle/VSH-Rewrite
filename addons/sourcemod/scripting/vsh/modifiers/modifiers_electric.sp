@@ -1,6 +1,6 @@
 #define ELECTRIC_BEAM	"sprites/laserbeam.spr"
 
-static bool g_bElectricDamage[TF_MAXPLAYERS];	//Whenever if client is currently being damaged or not
+static bool g_bElectricDamage[MAXPLAYERS];	//Whenever if client is currently being damaged or not
 
 public void ModifiersElectric_Create(SaxtonHaleBase boss)
 {
@@ -25,6 +25,18 @@ public void ModifiersElectric_GetRenderColor(SaxtonHaleBase boss, int iColor[4])
 	iColor[1] = 255;
 	iColor[2] = 0;
 	iColor[3] = 255;
+}
+
+public void ModifiersElectric_GetParticleEffect(SaxtonHaleBase boss, int index, char[] sEffect, int length)
+{
+	switch (index)
+	{
+		case 0:
+			strcopy(sEffect, length, "utaunt_storm_lightning2_k");
+		
+		case 1:
+			strcopy(sEffect, length, "utaunt_electricity_glow");
+	}
 }
 
 public Action ModifiersElectric_OnAttackDamage(SaxtonHaleBase boss, int victim, int &inflictor, float &damage, int &damagetype, int &weapon, float damageForce[3], float damagePosition[3], int damagecustom)

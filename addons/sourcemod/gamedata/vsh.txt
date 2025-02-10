@@ -4,12 +4,6 @@
 	{
 		"Signatures"
 		{
-			"CTFPlayer::GetMaxAmmo"
-			{
-				"library"	"server"
-				"linux"		"@_ZN9CTFPlayer10GetMaxAmmoEii"
-				"windows"	"\x55\x8B\xEC\x8B\x45\x0C\x56\x57\x8B\xF9\x83\xF8\xFF\x75\x2A\xFF\xB7\x2A\x2A\x2A\x2A\xEB\x01\x50\xE8"
-			}
 			"CTFPlayer::GetEquippedWearableForLoadoutSlot"
 			{
 				"library"	"server"
@@ -20,31 +14,31 @@
 			{
 				"library"	"server"
 				"linux"		"@_ZN9CTFPlayer20PlaySpecificSequenceEPKc"
-				"windows"	"\x55\x8B\xEC\x83\xEC\x30\x53\x56\x8B\x75\x08\x57\x56\x8B\xF9\xE8\x2A\x2A\x2A\x2A\x8B\xD8\x83\xFB\xFF\x74\x2A\x8B\x35\x2A\x2A\x2A\x2A\x8B\xCE\x8B\x16\xFF\x52\x2A\x8B\x8F\x2A\x2A\x2A\x2A\x53\x6A\x13\x8B\x01\xFF\x50"
+				"windows"	"\x55\x8B\xEC\x53\x56\x8B\x75\x08\x57\x56\x8B\xF9\xE8\x2A\x2A\x2A\x2A\x8B\xD8"
 			}
 			"CTFPlayer::AddObject"
 			{
 				"library"	"server"
 				"linux"		"@_ZN9CTFPlayer9AddObjectEP11CBaseObject"
-				"windows"	"\x55\x8B\xEC\x53\x56\x57\x8B\x7D\x08\x8B\xD9\x85\xFF\x74\x2A\x8B\x07\x8B\xCF\xFF\x50\x08\x8B\xCF"
+				"windows"	"\x55\x8B\xEC\x51\x53\x56\x57\x8B\x7D\x08\x8B\xD9\x85\xFF\x74\x2A\x8B\x07\x8B\xCF\xFF\x50\x08\x8B\x00\xEB\x2A\x83\xC8\xFF\x33\xF6\x89\x45\xFC\x39\xB3\x44\x23\x00\x00"
 			}
 			"CTFPlayer::RemoveObject"
 			{
 				"library"	"server"
 				"linux"		"@_ZN9CTFPlayer12RemoveObjectEP11CBaseObject"
-				"windows"	"\x55\x8B\xEC\x8B\xD1\x56\x8B\xB2\x8C\x21\x00\x00"
+				"windows"	"\x55\x8B\xEC\x56\x57\x8B\xF9\x8B\xB7\x44\x23\x00\x00"
 			}
 			"CWeaponMedigun::AllowedToHealTarget"
 			{
 				"library"	"server"
 				"linux"		"@_ZN14CWeaponMedigun19AllowedToHealTargetEP11CBaseEntity"
-				"windows"	"\x55\x8B\xEC\x53\x8B\xD9\x56\x57\x8B\xB3\xE8\x01\x00\x00"
+				"windows"	"\x55\x8B\xEC\x53\x8B\xD9\x56\x57\x8B\x93\x10\x02\x00\x00\x85\xD2\x0F\x84\x2A\x2A\x2A\x2A\xB9\xFF\x1F\x00\x00\x83\xFA\xFF\x74\x2A\x0F\xB7\xCA\xA1\x2A\x2A\x2A\x2A\xC1\xE1\x04\x8D\x78\x04\x03\xF9\x0F\x84\x2A\x2A\x2A\x2A\xC1\xEA\x10\x39\x57\x04\x0F\x85\x2A\x2A\x2A\x2A\x8B\x3F\x85\xFF\x0F\x84\x2A\x2A\x2A\x2A\x8B\x07\x8B\xCF\x8B\x80\x48\x01\x00\x00\xFF\xD0\x84\xC0\x0F\x84\x2A\x2A\x2A\x2A\x8B\x75\x08\x85\xF6\x74\x2A"
 			}
 			"CObjectDispenser::CouldHealTarget"
 			{
 				"library"	"server"
 				"linux"		"@_ZN16CObjectDispenser15CouldHealTargetEP11CBaseEntity"
-				"windows"	"\x55\x8B\xEC\x56\x8B\x75\x08\x57\x8B\xF9\x8B\x87\x10\x01\x00\x00"
+				"windows"	"\x55\x8B\xEC\x53\x56\x8B\x75\x08\x57\x8B\xF9\x8B\x87\x38\x01\x00\x00"
 			}
 		}
 		"Functions"
@@ -82,38 +76,43 @@
 		{
 			"CTFGameRules::GetCaptureValueForPlayer"
 			{
-				"linux"		"154"
-				"windows"	"153"
+				"linux"		"158"
+				"windows"	"157"
 			}
 			"CBaseEntity::ShouldTransmit"
 			{
-				"linux"		"19"
-				"windows"	"18"
+				"linux"		"21"
+				"windows"	"20"
 			}
 			"CTFPlayer::GiveNamedItem"
 			{
-				"linux"		"489"
-				"windows"	"482"
+				"linux"		"493"
+				"windows"	"486"
 			}
 			"CTFWeaponBase::SendWeaponAnim"
 			{
-				"linux"		"252"
-				"windows"	"246"
+				"linux"		"255"
+				"windows"	"249"
 			}
 			"CTFWeaponBase::GetMaxClip1"
 			{
-				"linux"		"327"
-				"windows"	"321"
+				"linux"		"330"
+				"windows"	"324"
 			}
 			"CTFStunBall::ApplyBallImpactEffectOnVictim"
 			{
-				"linux"		"264"
-				"windows"	"263"
+				"linux"		"267"
+				"windows"	"266"
 			}
 			"CTFStunBall::ShouldBallTouch"
 			{
-				"linux"		"266"
-				"windows"	"265"
+				"linux"		"269"
+				"windows"	"268"
+			}
+			"CTFJar::TossJarThink"
+			{
+				"linux"		"498"
+				"windows"	"491"
 			}
 		}
 	}

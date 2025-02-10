@@ -133,7 +133,6 @@ public void Seeldier_Precache(SaxtonHaleBase boss)
 	PrepareSound(SEELDIER_SEE_SND);
 	
 	AddFileToDownloadsTable("models/player/kirillian/boss/seeldier_fix.mdl");
-	AddFileToDownloadsTable("models/player/kirillian/boss/seeldier_fix.sw.vtx");
 	AddFileToDownloadsTable("models/player/kirillian/boss/seeldier_fix.vvd");
 	AddFileToDownloadsTable("models/player/kirillian/boss/seeldier_fix.dx80.vtx");
 	AddFileToDownloadsTable("models/player/kirillian/boss/seeldier_fix.dx90.vtx");
@@ -148,7 +147,6 @@ public void SeeldierMinion_Create(SaxtonHaleBase boss)
 	boss.iHealthPerPlayer = 0;
 	boss.nClass = TFClass_Soldier;
 	boss.iMaxRageDamage = -1;
-	boss.flWeighDownTimer = -1.0;
 	boss.bMinion = true;
 	
 	EmitSoundToClient(boss.iClient, SOUND_ALERT);	//Alert player as he spawned

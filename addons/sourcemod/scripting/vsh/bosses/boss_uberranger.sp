@@ -2,14 +2,14 @@
 #define RANGER_THEME 		"vsh_rewrite/uber_ranger/uberrangers_music.mp3"
 #define RANGER_RAGESOUND 	"mvm/mvm_tele_deliver.wav"
 
-static int g_iUberRangerMinionAFKTimeLeft[TF_MAXPLAYERS];
+static int g_iUberRangerMinionAFKTimeLeft[MAXPLAYERS];
 
 static ArrayList g_aUberRangerColorList;
 
-static Handle g_hUberRangerMinionAFKTimer[TF_MAXPLAYERS];
+static Handle g_hUberRangerMinionAFKTimer[MAXPLAYERS];
 
-static bool g_bUberRangerPlayerWasSummoned[TF_MAXPLAYERS];
-static bool g_bUberRangerMinionHasMoved[TF_MAXPLAYERS];
+static bool g_bUberRangerPlayerWasSummoned[MAXPLAYERS];
+static bool g_bUberRangerMinionHasMoved[MAXPLAYERS];
 
 static char g_strUberRangerRoundStart[][] = {
 	"vo/medic_battlecry05.mp3"
@@ -196,7 +196,7 @@ public void UberRanger_GetHudInfo(SaxtonHaleBase boss, char[] sMessage, int iLen
 public void UberRanger_Precache(SaxtonHaleBase boss)
 {
 	PrecacheModel(RANGER_MODEL);
-	PrepareSound(RANGER_THEME);
+	PrepareMusic(RANGER_THEME);
 	PrecacheSound(RANGER_RAGESOUND);
 	
 	for (int i = 0; i < sizeof(g_strUberRangerRoundStart); i++) PrecacheSound(g_strUberRangerRoundStart[i]);
@@ -217,7 +217,6 @@ public void UberRanger_Precache(SaxtonHaleBase boss)
 	AddFileToDownloadsTable("materials/models/player/boss/uber_ranger/uberranger_helmet.vmt");
 	
 	AddFileToDownloadsTable("models/player/vsh_rewrite/uber_ranger/uber_ranger_v2.mdl");
-	AddFileToDownloadsTable("models/player/vsh_rewrite/uber_ranger/uber_ranger_v2.sw.vtx");
 	AddFileToDownloadsTable("models/player/vsh_rewrite/uber_ranger/uber_ranger_v2.vvd");
 	AddFileToDownloadsTable("models/player/vsh_rewrite/uber_ranger/uber_ranger_v2.phy");
 	AddFileToDownloadsTable("models/player/vsh_rewrite/uber_ranger/uber_ranger_v2.dx80.vtx");
@@ -239,7 +238,6 @@ public void MinionRanger_Create(SaxtonHaleBase boss)
 	boss.iHealthPerPlayer = 40;
 	boss.nClass = TFClass_Medic;
 	boss.iMaxRageDamage = -1;
-	boss.flWeighDownTimer = -1.0;
 	boss.bMinion = true;
 	boss.bHealthPerPlayerAlive = true;
 	

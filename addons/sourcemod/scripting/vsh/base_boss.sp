@@ -1,12 +1,11 @@
-static char g_sClientBossRageMusic[TF_MAXPLAYERS][255];
+#define EFFECT_CLASSNAME		"info_particle_system"	// Any cheap ent that allows SetTransmit
 
-static bool g_bClientBossWeighDownForce[TF_MAXPLAYERS];
+static char g_sClientBossRageMusic[MAXPLAYERS][255];
 
-static float g_flClientBossWeighDownTimer[TF_MAXPLAYERS];
-static float g_flClientBossRageMusicVolume[TF_MAXPLAYERS];
+static float g_flClientBossRageMusicVolume[MAXPLAYERS];
 
-static Handle g_hClientBossModelTimer[TF_MAXPLAYERS];
-static Handle g_hClientBossRageMusicTime[TF_MAXPLAYERS];
+static Handle g_hClientBossModelTimer[MAXPLAYERS];
+static Handle g_hClientBossRageMusicTime[MAXPLAYERS];
 
 public void SaxtonHaleBoss_Create(SaxtonHaleBase boss)
 {
@@ -24,8 +23,6 @@ public void SaxtonHaleBoss_Create(SaxtonHaleBase boss)
 	boss.flMaxRagePercentage = 2.0;
 	boss.iRageDamage = 0;
 	boss.flEnvDamageCap = 200.0;
-	boss.flWeighDownTimer = 2.8;
-	boss.flWeighDownForce = 3000.0;
 	boss.flGlowTime = 0.0;
 	
 	boss.bMinion = false;
@@ -33,8 +30,6 @@ public void SaxtonHaleBoss_Create(SaxtonHaleBase boss)
 	boss.nClass = TFClass_Unknown;
 
 	g_sClientBossRageMusic[boss.iClient] = "";
-	g_bClientBossWeighDownForce[boss.iClient] = false;
-	g_flClientBossWeighDownTimer[boss.iClient] = 0.0;
 	g_flClientBossRageMusicVolume[boss.iClient] = 0.0;
 	g_hClientBossRageMusicTime[boss.iClient] = null;
 	
@@ -71,25 +66,6 @@ public void SaxtonHaleBoss_OnThink(SaxtonHaleBase boss)
 	{
 		float flMaxSpeed = boss.flSpeed + (boss.flSpeed*boss.flSpeedMult*(1.0-(float(boss.iHealth)/float(boss.iMaxHealth))));
 		SetEntPropFloat(boss.iClient, Prop_Data, "m_flMaxspeed", flMaxSpeed);
-	}
-	
-	if (GetEntityFlags(boss.iClient) & FL_ONGROUND)
-	{
-		//Reset weighdown timer
-		g_bClientBossWeighDownForce[boss.iClient] = false;
-		g_flClientBossWeighDownTimer[boss.iClient] = 0.0;
-	}
-	else if (g_bClientBossWeighDownForce[boss.iClient])
-	{
-		//Set weighdown force
-		float flVelocity[3];
-		flVelocity[2] = -boss.flWeighDownForce;
-		TeleportEntity(boss.iClient, NULL_VECTOR, NULL_VECTOR, flVelocity);
-	}
-	else if (g_flClientBossWeighDownTimer[boss.iClient] == 0.0 && !g_bClientBossWeighDownForce[boss.iClient])
-	{
-		//Start weighdown timer
-		g_flClientBossWeighDownTimer[boss.iClient] = GetGameTime();
 	}
 	
 	if (g_bRoundStarted && IsPlayerAlive(boss.iClient) && boss.iMaxRageDamage != -1)
@@ -132,26 +108,6 @@ public void SaxtonHaleBoss_OnThink(SaxtonHaleBase boss)
 	}
 }
 
-public void SaxtonHaleBoss_OnButton(SaxtonHaleBase boss, int &buttons)
-{
-	//Is boss crouching, allowed to use weighdown and passed timer
-	if (buttons & IN_DUCK
-		&& boss.flWeighDownTimer >= 0.0
-		&& g_flClientBossWeighDownTimer[boss.iClient] != 0.0
-		&& g_flClientBossWeighDownTimer[boss.iClient] < GetGameTime() - boss.flWeighDownTimer)
-	{
-		//Check if boss is looking down
-		float vecAngles[3];
-		GetClientEyeAngles(boss.iClient, vecAngles);
-		if (vecAngles[0] > 60.0)
-		{
-			//Enable weighdown
-			g_bClientBossWeighDownForce[boss.iClient] = true;
-			g_flClientBossWeighDownTimer[boss.iClient] = 0.0;
-		}
-	}
-}
-
 public void SaxtonHaleBoss_OnSpawn(SaxtonHaleBase boss)
 {
 	if (boss.bModel)
@@ -166,18 +122,19 @@ public void SaxtonHaleBoss_OnSpawn(SaxtonHaleBase boss)
 	
 	if (!boss.bMinion)
 	{
+		//Give every boss ground pound by default
+		if (!boss.HasClass("GroundPound"))
+			boss.CreateClass("GroundPound");
+		
 		//Give every bosses able to scare scout by default
 		if (!boss.HasClass("ScareRage")) //If boss don't have scare rage ability, give him one
 			boss.CreateClass("ScareRage");
 		
 		if (boss.StartFunction("ScareRage", "SetClass"))
 		{
-			//Use default radius (-1) if radius is already bigger than 500
-			float flRadius = boss.GetPropFloat("ScareRage", "Radius") > 500.0 ? -1.0 : 500.0;
-			
 			Call_PushCell(TFClass_Scout);	//Class to set
-			Call_PushFloat(flRadius);	//Radius
-			Call_PushFloat(-1.0);	//Duration (using default)
+			Call_PushFloat(400.0);	//Radius, halfed of hale
+			Call_PushFloat(5.0);	//Duration (using default)
 			Call_PushCell(TF_STUNFLAGS_SMALLBONK);	//Stunflags
 			Call_Finish();
 		}
@@ -190,9 +147,8 @@ public void SaxtonHaleBoss_OnSpawn(SaxtonHaleBase boss)
 		boss.iHealth = iHealth;
 	}
 	
-	int iColor[4] = {255, 255, 255, 255};
-	boss.CallFunction("GetRenderColor", iColor);
-	SetEntityRenderColor(boss.iClient, iColor[0], iColor[1], iColor[2], iColor[3]);
+	ClearBossEffects(boss.iClient);
+	RequestFrame(ApplyBossEffects, boss.iClient);
 	
 	boss.CallFunction("UpdateHudInfo", 0.0, 0.01);	//Update after frame when boss have all weapons equipped
 }
@@ -363,13 +319,13 @@ public Action SaxtonHaleBoss_OnTakeDamage(SaxtonHaleBase boss, int &attacker, in
 			float flEnvDamage = damage;
 			if ((damagetype & DMG_ACID)) flEnvDamage *= 3.0;
 
-			if (flEnvDamage > boss.flEnvDamageCap)
+			if (flEnvDamage >= boss.flEnvDamageCap)
 			{
-				int iBossSpawn = MaxClients+1;
 				int iTeam = GetClientTeam(boss.iClient);
 				ArrayList aSpawnPoints = new ArrayList();
 				
-				while ((iBossSpawn = FindEntityByClassname(iBossSpawn, "info_player_teamspawn")) > MaxClients)
+				int iBossSpawn = INVALID_ENT_REFERENCE;
+				while ((iBossSpawn = FindEntityByClassname(iBossSpawn, "info_player_teamspawn")) != INVALID_ENT_REFERENCE)
 					if (GetEntProp(iBossSpawn, Prop_Send, "m_iTeamNum") == iTeam)
 						aSpawnPoints.Push(iBossSpawn);
 				
@@ -393,6 +349,11 @@ public Action SaxtonHaleBoss_OnTakeDamage(SaxtonHaleBase boss, int &attacker, in
 	return action;
 }
 
+public void SaxtonHaleBoss_OnPickupTouch(SaxtonHaleBase boss, int iEntity, bool &bResult)
+{
+	bResult = false;
+}
+
 public void SaxtonHaleBoss_UpdateHudInfo(SaxtonHaleBase boss, float flinterval, float flDuration)
 {
 	Hud_UpdateBossInfo(boss.iClient, flinterval, flDuration);
@@ -400,7 +361,7 @@ public void SaxtonHaleBoss_UpdateHudInfo(SaxtonHaleBase boss, float flinterval, 
 
 public void SaxtonHaleBoss_Destroy(SaxtonHaleBase boss)
 {
-	SetEntityRenderColor(boss.iClient, 255, 255, 255, 255);
+	ClearBossEffects(boss.iClient);
 	
 	SetVariantString("");
 	AcceptEntityInput(boss.iClient, "SetCustomModel");
@@ -470,4 +431,78 @@ public Action Timer_BossRageMusic(Handle hTimer, SaxtonHaleBase boss)
 	}
 	
 	return Plugin_Continue;
+}
+
+Action AttachEnt_SetTransmit(int iAttachEnt, int iClient)
+{
+	int iOwner = GetEntPropEnt(iAttachEnt, Prop_Data, "m_pParent");
+	if (iOwner == INVALID_ENT_REFERENCE)
+		return Plugin_Stop;
+	
+	if (iOwner != iClient)
+	{
+		if (GetEntPropEnt(iClient, Prop_Send, "m_hObserverTarget") == iOwner && GetEntProp(iClient, Prop_Send, "m_iObserverMode") == OBS_MODE_IN_EYE)
+		    return Plugin_Stop;
+	}
+	else if (!TF2_IsPlayerInCondition(iOwner, TFCond_Taunting))
+	{
+		return Plugin_Stop;
+	}
+
+	if (TF2_IsPlayerInCondition(iOwner, TFCond_Cloaked) || TF2_IsPlayerInCondition(iOwner, TFCond_Disguised) || TF2_IsPlayerInCondition(iOwner, TFCond_Stealthed))
+		return Plugin_Stop;
+	
+	return Plugin_Continue;
+}
+
+void ApplyBossEffects(SaxtonHaleBase boss)
+{
+	ClearBossEffects(boss.iClient);
+
+	char sEffect[64];
+	for(int i = 0; ; i++)
+	{
+		boss.CallFunction("GetParticleEffect", i, sEffect, sizeof(sEffect));
+		if (!sEffect[0])
+			break;
+		
+		int iEntity = TF2_AttachParticle(sEffect, boss.iClient);
+		SetEdictFlags(iEntity, GetEdictFlags(iEntity) | FL_EDICT_ALWAYS);
+		CreateTimer(0.2, Timer_ApplySetTransmit, iEntity, TIMER_FLAG_NO_MAPCHANGE);
+		
+		sEffect[0] = 0;
+	}
+}
+
+static Action Timer_ApplySetTransmit(Handle hTimer, int iEntity)
+{
+	// Entity reference here
+	if(IsValidEntity(iEntity))
+	{
+		SetEdictFlags(iEntity, GetEdictFlags(iEntity) &~ FL_EDICT_ALWAYS);
+		SDKHook(iEntity, SDKHook_SetTransmit, AttachEnt_SetTransmit);
+	}
+	
+	return Plugin_Continue;
+}
+
+void ClearBossEffects(int iClient)
+{
+	int iEntity = INVALID_ENT_REFERENCE;
+	while ((iEntity = FindEntityByClassname(iEntity, EFFECT_CLASSNAME)) != INVALID_ENT_REFERENCE)
+	{
+		if (GetEntPropEnt(iEntity, Prop_Data, "m_pParent") != iClient)
+			continue;
+		
+		SetVariantString("ParticleEffectStop");
+		AcceptEntityInput(iEntity, "DispatchEffect");
+		AcceptEntityInput(iEntity, "ClearParent");
+		
+		//Some particles don't get removed properly, teleport far away then delete it
+		const float flCrazyBigNumber = 8192.00; // 2^13
+		float vecPos[3] = {flCrazyBigNumber, flCrazyBigNumber, flCrazyBigNumber};
+		TeleportEntity(iEntity, vecPos);
+		
+		CreateTimer(0.5, Timer_EntityCleanup, EntIndexToEntRef(iEntity));	//Give enough time for effect to fade out before getting destroyed
+	}
 }

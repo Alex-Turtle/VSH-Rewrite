@@ -2,9 +2,9 @@
 
 static int g_iWeaponBallStunType;
 
-static float g_flWeaponBallRageEnd[TF_MAXPLAYERS];
-static float g_flWeaponBallStunTime[TF_MAXPLAYERS];
-static int g_iWeaponBallThrower[TF_MAXPLAYERS];
+static float g_flWeaponBallRageEnd[MAXPLAYERS];
+static float g_flWeaponBallStunTime[MAXPLAYERS];
+static int g_iWeaponBallThrower[MAXPLAYERS];
 
 public void WeaponBall_Create(SaxtonHaleBase boss)
 {
@@ -24,7 +24,7 @@ public void WeaponBall_OnSpawn(SaxtonHaleBase boss)
 		TF2Attrib_ClearCache(iMelee);
 		
 		//Correctly set ammo
-		TF2_SetAmmo(boss.iClient, WeaponSlot_Melee, boss.GetPropInt("WeaponBall", "MaxBall"));
+		TF2_SetAmmo(boss.iClient, TF_AMMO_GRENADES1, boss.GetPropInt("WeaponBall", "MaxBall"));
 	}
 }
 
@@ -37,7 +37,7 @@ public void WeaponBall_OnThink(SaxtonHaleBase boss)
 {
 	//Unlimited ball during rage
 	if (g_flWeaponBallRageEnd[boss.iClient] > GetGameTime())
-		TF2_SetAmmo(boss.iClient, WeaponSlot_Melee, boss.GetPropInt("WeaponBall", "MaxBall"));
+		TF2_SetAmmo(boss.iClient, TF_AMMO_GRENADES1, boss.GetPropInt("WeaponBall", "MaxBall"));
 }
 
 public void WeaponBall_OnEntityCreated(SaxtonHaleBase boss, int iEntity, const char[] sClassname)
@@ -120,7 +120,7 @@ bool WeaponBall_IsValidBall(int iEntity, int &iThrower = 0, float &flTime = 0.0)
 		return false;
 	
 	SaxtonHaleBase boss = SaxtonHaleBase(iOwner);
-	if (boss.HasClass("CWeaponBall"))
+	if (!boss.HasClass("WeaponBall"))
 		return false;
 	
 	//Get whoever threw the ball, either from bonk boy, or from deflected pyro

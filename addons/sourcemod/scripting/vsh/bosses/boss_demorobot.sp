@@ -5,7 +5,7 @@
 #define DEMO_ROBOT_MODEL						"models/bots/demo/bot_demo.mdl"
 #define DEMO_ROBOT_GRENADE_LAUNCHER_SHOOT		"mvm/giant_demoman/giant_demoman_grenade_shoot.wav"
 
-static float g_flGrenadeLauncherRemoveTime[TF_MAXPLAYERS];
+static float g_flGrenadeLauncherRemoveTime[MAXPLAYERS];
 
 static char g_strSoundRobotFootsteps[][] =
 {
@@ -264,7 +264,7 @@ public void DemoRobot_Precache(SaxtonHaleBase boss)
 	PrecacheSound(DEMO_ROBOT_TURN_INTO_GIANT);
 	PrecacheSound(DEMO_ROBOT_DEATH);
 	PrecacheSound(DEMO_ROBOT_GRENADE_LAUNCHER_SHOOT);
-	PrepareSound(DEMO_ROBOT_THEME);
+	PrepareMusic(DEMO_ROBOT_THEME);
 	
 	PrecacheModel(DEMO_ROBOT_MODEL);
 }

@@ -11,7 +11,7 @@
 static bool g_bDomeCustomPos;	//Whenever if capture point is in custom pos
 static float g_vecDomeCP[3];	//Pos of CP
 static int g_iDomeTriggerRef;	//Trigger to control touch
-static bool g_bDomeCapturing[TF_MAXPLAYERS];
+static bool g_bDomeCapturing[MAXPLAYERS];
 
 //Dome prop
 static int g_iDomeEntRef;
@@ -21,8 +21,8 @@ static int g_iDomeColor[4];
 static float g_flDomeStart = 0.0;
 static float g_flDomeRadius = 0.0;
 static float g_flDomePreviousGameTime = 0.0;
-static float g_flDomePlayerTime[TF_MAXPLAYERS];
-static bool g_bDomePlayerOutside[TF_MAXPLAYERS];
+static float g_flDomePlayerTime[MAXPLAYERS];
+static bool g_bDomePlayerOutside[MAXPLAYERS];
 static Handle g_hDomeTimerBleed = null;
 
 void Dome_Init()
@@ -59,7 +59,6 @@ void Dome_MapStart()
 	AddFileToDownloadsTable("models/kirillian/brsphere_huge.dx80.vtx");
 	AddFileToDownloadsTable("models/kirillian/brsphere_huge.dx90.vtx");
 	AddFileToDownloadsTable("models/kirillian/brsphere_huge.mdl");
-	AddFileToDownloadsTable("models/kirillian/brsphere_huge.sw.vtx");
 	AddFileToDownloadsTable("models/kirillian/brsphere_huge.vvd");
 
 	AddFileToDownloadsTable("materials/models/kirillian/brsphere/br_fog.vmt");
@@ -585,4 +584,26 @@ bool Dome_IsDomeProp(int iProp)
 	GetEntPropString(iProp, Prop_Data, "m_ModelName", sModel, sizeof(sModel));
 			
 	return StrEqual(sModel, "models/props_gameplay/cap_point_base.mdl") || StrEqual(sModel, "models/props_doomsday/cap_point_small.mdl");
+}
+
+bool Dome_IsEntityOutside(int iEntity, bool bIsGettingHurt = false)
+{
+	if (bIsGettingHurt)
+	{
+		if (0 < iEntity <= MaxClients)
+		{
+			return g_bDomePlayerOutside[iEntity];
+		}
+		else
+		{
+			return (g_flDomeStart > 0.0 && Dome_GetTeam() != view_as<TFTeam>(GetEntProp(iEntity, Prop_Send, "m_iTeamNum")) && Dome_GetDistance(iEntity) > g_flDomeRadius)
+		}
+	}
+	
+	return g_flDomeStart > 0.0 && Dome_GetDistance(iEntity) > g_flDomeRadius;
+}
+
+TFTeam Dome_GetTeam()
+{
+	return g_nDomeTeamOwner;
 }

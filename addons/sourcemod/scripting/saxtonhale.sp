@@ -17,7 +17,7 @@
 
 #include "include/saxtonhale.inc"
 
-#define PLUGIN_VERSION 					"2.0.0"
+#define PLUGIN_VERSION 					"2.1.1"
 #define PLUGIN_VERSION_REVISION 		"manual"
 
 #if !defined SP_MAX_EXEC_PARAMS
@@ -31,12 +31,12 @@
 #define MAXLEN_CONFIG_VALUE 			256		//Config: Max string buffer size for individual values
 #define MAXLEN_CONFIG_VALUEARRAY		1024	//Config: Max string buffer size for groups of values
 
-#define TF_MAXPLAYERS					34	//32 clients + 1 for 0/world/console + 1 for replay/SourceTV
 #define MAX_ATTRIBUTES_SENT 			20
 
 #define ATTRIB_MELEE_RANGE_MULTIPLIER	264
 #define ATTRIB_BIDERECTIONAL			276
 #define ATTRIB_JUMP_HEIGHT				326
+#define ATTRIB_LESSHEALING				734
 
 #define ITEM_ROCK_PAPER_SCISSORS		1110
 
@@ -48,17 +48,6 @@
 #define SOUND_NULL			"vo/null.mp3"
 
 #define PARTICLE_GHOST 		"ghost_appearation"
-
-#define FL_EDICT_CHANGED	(1<<0)	// Game DLL sets this when the entity state changes
-									// Mutually exclusive with FL_EDICT_PARTIAL_CHANGE.
-
-#define FL_EDICT_FREE		(1<<1)	// this edict if free for reuse
-#define FL_EDICT_FULL		(1<<2)	// this is a full server entity
-
-#define FL_EDICT_FULLCHECK	(0<<0)  // call ShouldTransmit() each time, this is a fake flag
-#define FL_EDICT_ALWAYS		(1<<3)	// always transmit this entity
-#define FL_EDICT_DONTSEND	(1<<4)	// don't transmit this entity
-#define FL_EDICT_PVSCHECK	(1<<5)	// always transmit entity, but cull against PVS
 
 #define TEXT_TAG			"\x07E19300[\x07E17100VSH REWRITE\x07E19300]\x01"
 #define TEXT_COLOR			"\x07E19F00"
@@ -179,6 +168,20 @@ enum
 	DAMAGE_AIM,
 };
 
+// TF ammo types - from tf_shareddefs.h
+enum
+{
+	TF_AMMO_DUMMY = 0,
+	TF_AMMO_PRIMARY,
+	TF_AMMO_SECONDARY,
+	TF_AMMO_METAL,
+	TF_AMMO_GRENADES1,
+	TF_AMMO_GRENADES2,
+	TF_AMMO_GRENADES3,
+
+	TF_AMMO_COUNT,
+};
+
 enum
 {
 	CHANNEL_INTRO = 0,
@@ -188,6 +191,20 @@ enum
 	CHANNEL_UNUSED2,
 	CHANNEL_UNUSED3,
 	CHANNEL_MAX = 6,
+};
+
+enum
+{
+	OBS_MODE_NONE = 0,	// not in spectator mode
+	OBS_MODE_DEATHCAM,	// special mode for death cam animation
+	OBS_MODE_FREEZECAM,	// zooms to a target, and freeze-frames on them
+	OBS_MODE_FIXED,		// view from a fixed camera position
+	OBS_MODE_IN_EYE,	// follow a player in first person view
+	OBS_MODE_CHASE,		// follow a player in third person view
+	OBS_MODE_POI,		// PASSTIME point of interest - game objective, big fight, anything interesting; added in the middle of the enum due to tons of hard-coded "<ROAMING" enum compares
+	OBS_MODE_ROAMING,	// free roaming
+
+	NUM_OBSERVER_MODES,
 };
 
 char g_strPreferencesName[][] = {
@@ -305,15 +322,16 @@ Handle g_hTimerBossMusic;
 char g_sBossMusic[PLATFORM_MAX_PATH];
 int g_iHealthBarHealth;
 int g_iHealthBarMaxHealth;
+int g_iTelefragBuilder;
 
 //Player data
-int g_iPlayerLastButtons[TF_MAXPLAYERS];
-int g_iPlayerDamage[TF_MAXPLAYERS];
-int g_iPlayerAssistDamage[TF_MAXPLAYERS];
-int g_iClientOwner[TF_MAXPLAYERS];
-bool g_bClientAreaOfEffect[TF_MAXPLAYERS][TF_MAXPLAYERS];
+int g_iPlayerLastButtons[MAXPLAYERS];
+int g_iPlayerDamage[MAXPLAYERS];
+int g_iPlayerAssistDamage[MAXPLAYERS];
+int g_iClientOwner[MAXPLAYERS];
+bool g_bClientAreaOfEffect[MAXPLAYERS][MAXPLAYERS];
 
-int g_iClientFlags[TF_MAXPLAYERS];
+int g_iClientFlags[MAXPLAYERS];
 
 //Game state data
 int g_iTotalRoundPlayed;
@@ -340,6 +358,8 @@ ConVar tf_arena_preround_time;
 #include "vsh/abilities/ability_brave_jump.sp"
 #include "vsh/abilities/ability_dash_jump.sp"
 #include "vsh/abilities/ability_groundpound.sp"
+#include "vsh/abilities/ability_lunge.sp"
+#include "vsh/abilities/ability_rage_attributes.sp"
 #include "vsh/abilities/ability_rage_bomb.sp"
 #include "vsh/abilities/ability_rage_bomb_projectile.sp"
 #include "vsh/abilities/ability_rage_conditions.sp"
@@ -347,6 +367,7 @@ ConVar tf_arena_preround_time;
 #include "vsh/abilities/ability_rage_gas.sp"
 #include "vsh/abilities/ability_rage_ghost.sp"
 #include "vsh/abilities/ability_rage_light.sp"
+#include "vsh/abilities/ability_rage_meteor.sp"
 #include "vsh/abilities/ability_rage_scare.sp"
 #include "vsh/abilities/ability_teleport_swap.sp"
 #include "vsh/abilities/ability_teleport_view.sp"
@@ -503,6 +524,7 @@ public void OnPluginStart()
 	SDK_Init();
 	TagsCall_Init();
 	TagsCore_Init();
+	TagsDamage_Init();
 	TagsName_Init();
 	
 	SaxtonHaleFunction func;
@@ -548,6 +570,7 @@ public void OnPluginStart()
 	SaxtonHaleFunction("OnAttackCritical", ET_Hook, Param_Cell, Param_CellByRef);
 	SaxtonHaleFunction("OnVoiceCommand", ET_Hook, Param_String, Param_String);
 	SaxtonHaleFunction("OnStartTouch", ET_Hook, Param_Cell);
+	SaxtonHaleFunction("OnPickupTouch", ET_Ignore, Param_Cell, Param_CellByRef);
 	SaxtonHaleFunction("OnWeaponSwitchPost", ET_Ignore, Param_Cell);
 	SaxtonHaleFunction("OnConditionAdded", ET_Ignore, Param_Cell);
 	SaxtonHaleFunction("OnConditionRemoved", ET_Ignore, Param_Cell);
@@ -573,6 +596,14 @@ public void OnPluginStart()
 	func.SetParam(6, Param_Array, VSHArrayType_Static, 3);
 	func.SetParam(7, Param_Array, VSHArrayType_Static, 3);
 	
+	func = SaxtonHaleFunction("OnAttackDamageAlive", ET_Hook, Param_Cell, Param_CellByRef, Param_FloatByRef, Param_CellByRef, Param_CellByRef, Param_Array, Param_Array, Param_Cell);
+	func.SetParam(6, Param_Array, VSHArrayType_Static, 3);
+	func.SetParam(7, Param_Array, VSHArrayType_Static, 3);
+	
+	func = SaxtonHaleFunction("OnTakeDamageAlive", ET_Hook, Param_CellByRef, Param_CellByRef, Param_FloatByRef, Param_CellByRef, Param_CellByRef, Param_Array, Param_Array, Param_Cell);
+	func.SetParam(6, Param_Array, VSHArrayType_Static, 3);
+	func.SetParam(7, Param_Array, VSHArrayType_Static, 3);
+	
 	//Button functions
 	SaxtonHaleFunction("OnButton", ET_Ignore, Param_CellByRef);
 	SaxtonHaleFunction("OnButtonPress", ET_Ignore, Param_Cell);
@@ -593,12 +624,15 @@ public void OnPluginStart()
 	
 	func = SaxtonHaleFunction("GetSoundKill", ET_Ignore, Param_String, Param_Cell, Param_Cell);
 	func.SetParam(1, Param_String, VSHArrayType_Dynamic, 2);
-	
+
 	func = SaxtonHaleFunction("GetSoundAbility", ET_Ignore, Param_String, Param_Cell, Param_String);
 	func.SetParam(1, Param_String, VSHArrayType_Dynamic, 2);
 	
 	func = SaxtonHaleFunction("GetRenderColor", ET_Ignore, Param_Array);
 	func.SetParam(1, Param_Array, VSHArrayType_Static, 4);
+	
+	func = SaxtonHaleFunction("GetParticleEffect", ET_Ignore, Param_Cell, Param_String, Param_Cell);
+	func.SetParam(2, Param_String, VSHArrayType_Dynamic, 3);
 	
 	func = SaxtonHaleFunction("GetMusicInfo", ET_Ignore, Param_String, Param_Cell, Param_FloatByRef);
 	func.SetParam(1, Param_String, VSHArrayType_Dynamic, 2);
@@ -660,11 +694,14 @@ public void OnPluginStart()
 	SaxtonHale_RegisterClass("BraveJump", VSHClassType_Ability);
 	SaxtonHale_RegisterClass("DashJump", VSHClassType_Ability);
 	SaxtonHale_RegisterClass("GroundPound", VSHClassType_Ability);
+	SaxtonHale_RegisterClass("Lunge", VSHClassType_Ability);
+	SaxtonHale_RegisterClass("RageAttributes", VSHClassType_Ability);
 	SaxtonHale_RegisterClass("RageAddCond", VSHClassType_Ability);
 	SaxtonHale_RegisterClass("RageFreeze", VSHClassType_Ability);
 	SaxtonHale_RegisterClass("RageGas", VSHClassType_Ability);
 	SaxtonHale_RegisterClass("RageGhost", VSHClassType_Ability);
 	SaxtonHale_RegisterClass("LightRage", VSHClassType_Ability);
+	SaxtonHale_RegisterClass("RageMeteor", VSHClassType_Ability);
 	SaxtonHale_RegisterClass("ScareRage", VSHClassType_Ability);
 	SaxtonHale_RegisterClass("TeleportSwap", VSHClassType_Ability);
 	SaxtonHale_RegisterClass("TeleportView", VSHClassType_Ability);
@@ -732,6 +769,12 @@ public void OnLibraryRemoved(const char[] sName)
 	}
 }
 
+public void OnNotifyPluginUnloaded(Handle hPlugin)
+{
+	FuncClass_ClearUnloadedPlugin(hPlugin);
+	FuncNative_ClearUnloadedPlugin(hPlugin);
+}
+
 public void OnPluginEnd()
 {
 	for (int iClient = 1; iClient <= MaxClients; iClient++)
@@ -741,6 +784,9 @@ public void OnPluginEnd()
 			SaxtonHaleBase boss = SaxtonHaleBase(iClient);
 			boss.DestroyAllClass();
 		}
+		
+		if (IsClientInGame(iClient) && !StrEmpty(g_sBossMusic))
+			StopSound(iClient, SNDCHAN_STATIC, g_sBossMusic);
 		
 		RemoveClientGlowEnt(iClient);
 	}
@@ -1037,10 +1083,15 @@ public Action ItemPack_OnTouch(int iEntity, int iToucher)
 	if (!g_bEnabled) return Plugin_Continue;
 	if (g_iTotalRoundPlayed <= 0) return Plugin_Continue;
 	
-	//Don't allow valid non-attack players pick health and ammo packs
-	if (!SaxtonHale_IsValidAttack(iToucher))
-		return Plugin_Handled;
-
+	if (SaxtonHale_IsValidBoss(iToucher))
+	{
+		bool bResult;
+		SaxtonHaleBase(iToucher).CallFunction("OnPickupTouch", iEntity, bResult);
+		
+		if (!bResult)
+			return Plugin_Handled;
+	}
+	
 	return Plugin_Continue;
 }
 
@@ -1080,6 +1131,7 @@ public void Frame_CallJarate(DataPack data)
 	data.Reset();
 	int iClient = GetClientOfUserId(data.ReadCell());
 	TagsParams tParams = data.ReadCell();
+	delete data;
 	
 	if (iClient <= 0 || iClient > MaxClients || !IsClientInGame(iClient) || !IsPlayerAlive(iClient))
 	{
@@ -1099,11 +1151,18 @@ public void TF2_OnConditionAdded(int iClient, TFCond nCond)
 	if (SaxtonHale_IsValidBoss(iClient))
 	{
 		SaxtonHaleBase(iClient).CallFunction("OnConditionAdded", nCond);
-		
-		if (nCond == TFCond_Milked)
+
+		switch (nCond)
 		{
-			EmitSoundToClient(iClient, SOUND_JAR_EXPLODE);
-			PrintCenterText(iClient, "You were milked!");
+			case TFCond_Cloaked, TFCond_Disguised, TFCond_Stealthed:
+			{
+				ClearBossEffects(iClient);
+			}
+			case TFCond_Milked:
+			{
+				EmitSoundToClient(iClient, SOUND_JAR_EXPLODE);
+				PrintCenterText(iClient, "You were milked!");
+			}
 		}
 	}
 	
@@ -1123,7 +1182,17 @@ public void TF2_OnConditionRemoved(int iClient, TFCond nCond)
 	if (g_iTotalRoundPlayed <= 0) return;
 	
 	if (SaxtonHale_IsValidBoss(iClient))
+	{
 		SaxtonHaleBase(iClient).CallFunction("OnConditionRemoved", nCond);
+
+		switch (nCond)
+		{
+			case TFCond_Cloaked, TFCond_Disguised, TFCond_Stealthed:
+			{
+				ApplyBossEffects(SaxtonHaleBase(iClient));
+			}
+		}
+	}
 	
 	if (nCond == TFCond_Disguising || nCond == TFCond_Disguised)
 		UpdateClientGlowEnt(iClient);
@@ -1163,10 +1232,10 @@ public Action Timer_Music(Handle hTimer, SaxtonHaleBase boss)
 		if (IsClientInGame(iClient))
 		{
 			//Stop current music before playing another one
-			StopSound(iClient, SNDCHAN_AUTO, g_sBossMusic);
+			StopSound(iClient, SNDCHAN_STATIC, g_sBossMusic);
 			
 			if (Preferences_Get(iClient, VSHPreferences_Music))
-				EmitSoundToClient(iClient, g_sBossMusic);
+				EmitSoundToClient(iClient, g_sBossMusic, _, SNDCHAN_STATIC, SNDLEVEL_NONE);
 		}
 	}
 
@@ -1217,6 +1286,8 @@ public void OnClientPutInServer(int iClient)
 	SDK_HookGiveNamedItem(iClient);
 	SDKHook(iClient, SDKHook_PreThink, Client_OnThink);
 	SDKHook(iClient, SDKHook_OnTakeDamageAlive, Client_OnTakeDamageAlive);
+	SDKHook(iClient, SDKHook_OnTakeDamage, Client_OnTakeDamage);
+	SDKHook(iClient, SDKHook_OnTakeDamagePost, Client_OnTakeDamagePost);
 	SDKHook(iClient, SDKHook_StartTouch, Client_OnStartTouch);
 	SDKHook(iClient, SDKHook_WeaponSwitchPost, Client_OnWeaponSwitchPost);
 	
@@ -1329,7 +1400,7 @@ public void Client_OnThink(int iClient)
 	Hud_Think(iClient);
 }
 
-public Action Client_OnTakeDamageAlive(int victim, int &attacker, int &inflictor, float &damage, int &damagetype, int &weapon, float damageForce[3], float damagePosition[3], int damagecustom)
+public Action Client_OnTakeDamage(int victim, int &attacker, int &inflictor, float &damage, int &damagetype, int &weapon, float damageForce[3], float damagePosition[3], int damagecustom)
 {
 	if (!g_bEnabled) return Plugin_Continue;
 	if (g_iTotalRoundPlayed <= 0) return Plugin_Continue;
@@ -1361,15 +1432,8 @@ public Action Client_OnTakeDamageAlive(int victim, int &attacker, int &inflictor
 		if (finalAction == Plugin_Stop)
 			return finalAction;
 		
-		//Call damage tags
-		action = TagsDamage_OnTakeDamage(victim, attacker, inflictor, damage, damagetype, weapon, damageForce, damagePosition, damagecustom);
-		if (action > finalAction)
-			finalAction = action;
-		
-		char sWeaponClass[64];
-		if (weapon > MaxClients)
-			GetEdictClassname(weapon, sWeaponClass, sizeof(sWeaponClass));
-		
+		g_iTelefragBuilder = 0;
+		int iBuilder;
 		if (0 < attacker <= MaxClients && IsClientInGame(attacker))
 		{
 			if (!bossAttacker.bValid)
@@ -1380,11 +1444,12 @@ public Action Client_OnTakeDamageAlive(int victim, int &attacker, int &inflictor
 					{
 						int iTelefragDamage = g_ConfigConvar.LookupInt("vsh_telefrag_damage");
 						damage = float(iTelefragDamage);
+						damagetype &= ~DMG_CRIT;
+						
 						PrintCenterText(attacker, "TELEFRAG! You are a pro.");
 						PrintCenterText(victim, "TELEFRAG! Be careful around quantum tunneling devices!");
 						
 						//Try to retrieve the entity under the player, and hopefully this is the teleporter
-						int iBuilder = 0;
 						int iGroundEntity = GetEntPropEnt(attacker, Prop_Send, "m_hGroundEntity");
 						if (iGroundEntity > MaxClients)
 						{
@@ -1395,8 +1460,8 @@ public Action Client_OnTakeDamageAlive(int victim, int &attacker, int &inflictor
 								iBuilder = GetEntPropEnt(iGroundEntity, Prop_Send, "m_hBuilder");
 								if (0 < iBuilder <= MaxClients && IsClientInGame(iBuilder))
 								{
-									if (attacker != iBuilder)
-										g_iPlayerAssistDamage[attacker] = iTelefragDamage;
+									if (attacker == iBuilder)
+										iBuilder = 0;
 								}
 								else
 								{
@@ -1404,14 +1469,110 @@ public Action Client_OnTakeDamageAlive(int victim, int &attacker, int &inflictor
 								}
 							}
 						}
-
+						
 						Forward_TeleportDamage(victim, attacker, iBuilder);
+						g_iTelefragBuilder = iBuilder;
 						finalAction = Plugin_Changed;
 					}
 				}
 			}
 		}
+		
+		//Call damage tags
+		action = TagsDamage_OnTakeDamage(victim, attacker, inflictor, damage, damagetype, weapon, damageForce, damagePosition, damagecustom);
+		if (action > finalAction)
+			finalAction = action;
 	}
+	
+	if (victim != attacker && SaxtonHale_IsValidAttack(attacker) && weapon != INVALID_ENT_REFERENCE && HasEntProp(weapon, Prop_Send, "m_iItemDefinitionIndex"))
+	{
+		TFClassType nClass = TF2_GetPlayerClass(attacker);
+		int iIndex = GetEntProp(weapon, Prop_Send, "m_iItemDefinitionIndex");
+		int iSlot = TF2_GetItemSlot(iIndex, nClass);
+		
+		if (0 <= iSlot < sizeof(g_ConfigClass[]))
+		{
+			int iIgnoreFalloff = g_ConfigIndex.IgnoreFalloff(iIndex);
+			if (iIgnoreFalloff == -1)
+				iIgnoreFalloff = g_ConfigClass[nClass][iSlot].IgnoreFalloff();
+			
+			if (iIgnoreFalloff == 1)
+				TF2_AddCondition(attacker, TFCond_RunePrecision, 0.05);
+		}
+	}
+	
+	return finalAction;
+}
+
+public void Client_OnTakeDamagePost(int victim, int attacker, int inflictor, float damage, int damagetype, int weapon, const float damageForce[3], const float damagePosition[3], int damagecustom)
+{
+	if (!g_bEnabled) return;
+	if (g_iTotalRoundPlayed <= 0) return;
+	
+	if (victim != attacker && SaxtonHale_IsValidAttack(attacker) && weapon != INVALID_ENT_REFERENCE && HasEntProp(weapon, Prop_Send, "m_iItemDefinitionIndex"))
+	{
+		TFClassType nClass = TF2_GetPlayerClass(attacker);
+		int iIndex = GetEntProp(weapon, Prop_Send, "m_iItemDefinitionIndex");
+		int iSlot = TF2_GetItemSlot(iIndex, nClass);
+		
+		if (0 <= iSlot < sizeof(g_ConfigClass[]))
+		{
+			int iIgnoreFalloff = g_ConfigIndex.IgnoreFalloff(iIndex);
+			if (iIgnoreFalloff == -1)
+				iIgnoreFalloff = g_ConfigClass[nClass][iSlot].IgnoreFalloff();
+			
+			if (iIgnoreFalloff == 1)
+				TF2_RemoveCondition(attacker, TFCond_RunePrecision);
+		}
+	}
+}
+
+public Action Client_OnTakeDamageAlive(int victim, int &attacker, int &inflictor, float &damage, int &damagetype, int &weapon, float damageForce[3], float damagePosition[3], int damagecustom)
+{
+	if (!g_bEnabled) return Plugin_Continue;
+	if (g_iTotalRoundPlayed <= 0) return Plugin_Continue;
+	
+	Action finalAction = Plugin_Continue;
+	
+	if (0 < victim <= MaxClients && IsClientInGame(victim) && GetClientTeam(victim) > 1)
+	{
+		SaxtonHaleBase bossVictim = SaxtonHaleBase(victim);
+		SaxtonHaleBase bossAttacker = SaxtonHaleBase(attacker);
+		
+		Action action = Plugin_Continue;
+		
+		if (bossVictim.bValid)
+		{
+			action = bossVictim.CallFunction("OnTakeDamageAlive", attacker, inflictor, damage, damagetype, weapon, damageForce, damagePosition, damagecustom);
+			if (action > finalAction)
+				finalAction = action;
+		}
+		
+		if (0 < attacker <= MaxClients && victim != attacker && bossAttacker.bValid)
+		{
+			action = bossAttacker.CallFunction("OnAttackDamageAlive", victim, inflictor, damage, damagetype, weapon, damageForce, damagePosition, damagecustom);
+			if (action > finalAction)
+				finalAction = action;
+		}
+		
+		//Stop immediately if returning Plugin_Stop
+		if (finalAction == Plugin_Stop)
+			return finalAction;
+		
+		//Call damage tags
+		action = TagsDamage_OnTakeDamageAlive(victim, attacker, inflictor, damage, damagetype, weapon, damageForce, damagePosition, damagecustom);
+		if (action > finalAction)
+			finalAction = action;
+		
+		// Give telefrag assists after tags modified it
+		if (damagecustom == TF_CUSTOM_TELEFRAG)
+		{
+			int iBuilder = g_iTelefragBuilder;
+			if (iBuilder)
+				g_iPlayerAssistDamage[iBuilder] = RoundToNearest(damage);
+		}
+	}
+	
 	return finalAction;
 }
 
@@ -1618,7 +1779,7 @@ void UpdateClientGlowEnt(int iClient)
 		"models/player/engineer.mdl",
 	};
 	
-	static int iClientGlowEnt[TF_MAXPLAYERS];
+	static int iClientGlowEnt[MAXPLAYERS];
 	if (!iClientGlowEnt[iClient])
 		iClientGlowEnt[iClient] = INVALID_ENT_REFERENCE;
 	

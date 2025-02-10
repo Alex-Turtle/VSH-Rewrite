@@ -1,6 +1,6 @@
 #define ATTRIB_NO_JUMP	819
 
-static float g_flJumpCooldown[TF_MAXPLAYERS];
+static float g_flJumpCooldown[MAXPLAYERS];
 
 public void ModifiersJumper_Create(SaxtonHaleBase boss)
 {
@@ -26,6 +26,18 @@ public void ModifiersJumper_GetRenderColor(SaxtonHaleBase boss, int iColor[4])
 	iColor[1] = 144;
 	iColor[2] = 255;
 	iColor[3] = 255;
+}
+
+public void ModifiersJumper_GetParticleEffect(SaxtonHaleBase boss, int index, char[] sEffect, int length)
+{
+	switch (index)
+	{
+		case 0:
+			strcopy(sEffect, length, "utaunt_pedalfly_blue_pedals2");
+		
+		case 1:
+			strcopy(sEffect, length, "player_intel_trail_blue");
+	}
 }
 
 public void ModifiersJumper_OnButtonPress(SaxtonHaleBase boss, int iButton)

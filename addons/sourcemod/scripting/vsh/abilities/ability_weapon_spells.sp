@@ -1,7 +1,7 @@
-static ArrayList g_aSpells[TF_MAXPLAYERS];
-static int g_iCurrentSpellArray[TF_MAXPLAYERS];
-static haleSpells g_rageSpells[TF_MAXPLAYERS];
-static float g_flSpellsLastUsed[TF_MAXPLAYERS];
+static ArrayList g_aSpells[MAXPLAYERS];
+static int g_iCurrentSpellArray[MAXPLAYERS];
+static haleSpells g_rageSpells[MAXPLAYERS];
+static float g_flSpellsLastUsed[MAXPLAYERS];
 
 enum haleSpells
 {
@@ -234,6 +234,23 @@ public void WeaponSpells_OnButtonPress(SaxtonHaleBase boss, int button)
 		//Just another way to use spells rather than using default H key
 		Client_ForceUseAction(boss.iClient);
 	}
+}
+
+public void WeaponSpells_OnEntityCreated(SaxtonHaleBase boss, int iEntity, const char[] sClassname)
+{
+	if (StrEqual(sClassname, "eyeball_boss"))
+		SDKHook(iEntity, SDKHook_SpawnPost, WeaponSpells_OnMonoculusSpawnPost);
+}
+
+void WeaponSpells_OnMonoculusSpawnPost(int iEntity)
+{
+	int iOwner = GetEntPropEnt(iEntity, Prop_Send, "m_hOwnerEntity");
+	if (iOwner <= 0 || iOwner > MaxClients || !IsClientInGame(iOwner))
+		return;
+	
+	SaxtonHaleBase boss = SaxtonHaleBase(iOwner);
+	if (boss.HasClass("WeaponSpells"))
+		SetEntProp(iEntity, Prop_Data, "m_takedamage", DAMAGE_NO);
 }
 
 //GetPlayerWeaponSlot is not that great into getting spellbook

@@ -1,8 +1,8 @@
 #define GENTLE_SPY_MODEL "models/freak_fortress_2/gentlespy/the_gentlespy_v1.mdl"
 #define GENTLE_SPY_THEME "vsh_rewrite/gentlespy/gentle_music.mp3"
 
-static bool g_bFirstCloak[TF_MAXPLAYERS];
-static bool g_bIsCloaked[TF_MAXPLAYERS];
+static bool g_bFirstCloak[MAXPLAYERS];
+static bool g_bIsCloaked[MAXPLAYERS];
 
 static char g_strGentleSpyRoundStart[][] = {
 	"vo/spy_cloakedspy01.mp3",
@@ -106,7 +106,7 @@ public void GentleSpy_OnSpawn(SaxtonHaleBase boss)
 	if (iWeapon > MaxClients)
 	{
 		SetEntProp(iWeapon, Prop_Send, "m_iClip1", 0);
-		SetEntProp(iClient, Prop_Send, "m_iAmmo", 0, _, 2);
+		TF2_SetAmmo(iClient, TF_AMMO_SECONDARY, 0);
 	}
 	/*
 	Ambassador attributes:
@@ -324,7 +324,7 @@ public void GentleSpy_Precache(SaxtonHaleBase boss)
 {
 	PrecacheModel(GENTLE_SPY_MODEL);
 	
-	PrepareSound(GENTLE_SPY_THEME);
+	PrepareMusic(GENTLE_SPY_THEME);
 	
 	for (int i = 0; i < sizeof(g_strGentleSpyRoundStart); i++) PrecacheSound(g_strGentleSpyRoundStart[i]);
 	for (int i = 0; i < sizeof(g_strGentleSpyWin); i++) PrecacheSound(g_strGentleSpyWin[i]);
@@ -341,7 +341,6 @@ public void GentleSpy_Precache(SaxtonHaleBase boss)
 	AddFileToDownloadsTable("materials/freak_fortress_2/gentlespy_tex/stylish_spy_normal.vtf");
 	
 	AddFileToDownloadsTable("models/freak_fortress_2/gentlespy/the_gentlespy_v1.mdl");
-	AddFileToDownloadsTable("models/freak_fortress_2/gentlespy/the_gentlespy_v1.sw.vtx");
 	AddFileToDownloadsTable("models/freak_fortress_2/gentlespy/the_gentlespy_v1.vvd");
 	AddFileToDownloadsTable("models/freak_fortress_2/gentlespy/the_gentlespy_v1.dx80.vtx");
 	AddFileToDownloadsTable("models/freak_fortress_2/gentlespy/the_gentlespy_v1.dx90.vtx");

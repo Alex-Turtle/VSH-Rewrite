@@ -5,7 +5,6 @@ static Handle g_hHookGiveNamedItem;
 static Handle g_hHookBallImpact;
 static Handle g_hHookShouldBallTouch;
 static Handle g_hSDKGetMaxHealth;
-static Handle g_hSDKGetMaxAmmo;
 static Handle g_hSDKSendWeaponAnim;
 static Handle g_hSDKPlaySpecificSequence;
 static Handle g_hSDKGetMaxClip;
@@ -14,10 +13,11 @@ static Handle g_hSDKGetEquippedWearable;
 static Handle g_hSDKEquipWearable;
 static Handle g_hSDKAddObject;
 static Handle g_hSDKRemoveObject;
+static Handle g_hSDKTossJarThink;
 
 int g_iOffsetFuseTime = -1;
 
-static int g_iHookIdGiveNamedItem[TF_MAXPLAYERS];
+static int g_iHookIdGiveNamedItem[MAXPLAYERS];
 
 void SDK_Init()
 {
@@ -75,16 +75,6 @@ void SDK_Init()
 		LogMessage("Failed to create hook: CTFGameRules::GetCaptureValueForPlayer");
 	else
 		DHookAddParam(g_hHookGetCaptureValueForPlayer, HookParamType_CBaseEntity);
-	
-	// This call gets the weapon max ammo
-	StartPrepSDKCall(SDKCall_Player);
-	PrepSDKCall_SetFromConf(hGameData, SDKConf_Signature, "CTFPlayer::GetMaxAmmo");
-	PrepSDKCall_AddParameter(SDKType_PlainOldData, SDKPass_Plain);
-	PrepSDKCall_AddParameter(SDKType_PlainOldData, SDKPass_Plain);
-	PrepSDKCall_SetReturnInfo(SDKType_PlainOldData, SDKPass_Plain);
-	g_hSDKGetMaxAmmo = EndPrepSDKCall();
-	if (g_hSDKGetMaxAmmo == null)
-		LogMessage("Failed to create call: CTFPlayer::GetMaxAmmo!");
 
 	// This call gets wearable equipped in loadout slots
 	StartPrepSDKCall(SDKCall_Player);
@@ -134,6 +124,12 @@ void SDK_Init()
 	g_hSDKRemoveObject = EndPrepSDKCall();
 	if (g_hSDKRemoveObject == null)
 		LogMessage("Failed to create call: CTFPlayer::RemoveObject!");
+	
+	StartPrepSDKCall(SDKCall_Entity);
+	PrepSDKCall_SetFromConf(hGameData, SDKConf_Virtual, "CTFJar::TossJarThink");
+	g_hSDKTossJarThink = EndPrepSDKCall();
+	if (!g_hSDKTossJarThink)
+		LogError("Failed to create call: CTFJar::TossJarThink!");
 	
 	// This hook allows entity to always transmit
 	iOffset = hGameData.GetOffset("CBaseEntity::ShouldTransmit");
@@ -388,23 +384,16 @@ public MRESReturn Hook_CouldHealTarget(int iDispenser, Handle hReturn, Handle hP
 			
 			return MRES_Ignored;
 		}
-		
-		if (SaxtonHale_IsValidBoss(iHealTarget))
-		{
-			//Never allow heal boss from any other sources
-			DHookSetReturn(hReturn, false);
-			return MRES_Supercede;
-		}
+	}
+	
+	if (SaxtonHale_IsValidBoss(iHealTarget))
+	{
+		//Never allow heal boss from any other sources
+		DHookSetReturn(hReturn, false);
+		return MRES_Supercede;
 	}
 	
 	return MRES_Ignored;
-}
-
-int SDK_GetMaxAmmo(int iClient, int iSlot)
-{
-	if (g_hSDKGetMaxAmmo != null)
-		return SDKCall(g_hSDKGetMaxAmmo, iClient, iSlot, -1);
-	return -1;
 }
 
 void SDK_SendWeaponAnim(int weapon, int anim)
@@ -461,6 +450,11 @@ void SDK_RemoveObject(int iClient, int iEntity)
 {
 	if(g_hSDKRemoveObject != null)
 		SDKCall(g_hSDKRemoveObject, iClient, iEntity);
+}
+
+void SDK_TossJarThink(int iEntity)
+{
+	SDKCall(g_hSDKTossJarThink, iEntity);
 }
 
 void SDK_SetFuseTime(int iEntity, float flTime)

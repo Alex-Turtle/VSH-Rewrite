@@ -1,4 +1,4 @@
-static float g_flClientAngryLastTime[TF_MAXPLAYERS];
+static float g_flClientAngryLastTime[MAXPLAYERS];
 
 public void ModifiersAngry_Create(SaxtonHaleBase boss)
 {
@@ -26,6 +26,12 @@ public void ModifiersAngry_GetRenderColor(SaxtonHaleBase boss, int iColor[4])
 	iColor[1] = 96;
 	iColor[2] = 48;
 	iColor[3] = 255;
+}
+
+public void ModifiersAngry_GetParticleEffect(SaxtonHaleBase boss, int index, char[] sEffect, int length)
+{
+	if (index == 0)
+		strcopy(sEffect, length, "utaunt_storm_cloud_o");
 }
 
 public void ModifiersAngry_OnThink(SaxtonHaleBase boss)

@@ -1,14 +1,14 @@
-static int g_iBackstabCount[TF_MAXPLAYERS][TF_MAXPLAYERS];
-static int g_iClimbAmount[TF_MAXPLAYERS];
-static int g_iZombieUsed[TF_MAXPLAYERS];
-static float g_flUberBeforeHealingBuilding[TF_MAXPLAYERS];
-static float g_flDispenserBoost[TF_MAXPLAYERS];
+static int g_iBackstabCount[MAXPLAYERS][MAXPLAYERS];
+static int g_iClimbAmount[MAXPLAYERS];
+static int g_iZombieUsed[MAXPLAYERS];
+static float g_flUberBeforeHealingBuilding[MAXPLAYERS];
+static float g_flDispenserBoost[MAXPLAYERS];
 
-static bool g_bTagsLunchbox[TF_MAXPLAYERS];
+static bool g_bTagsLunchbox[MAXPLAYERS];
 
-static float g_flTagsAirblastCooldown[TF_MAXPLAYERS];
-static float g_flTagsAirblastLastUsed[TF_MAXPLAYERS];
-static FlamethrowerState g_nTagsAirblastState[TF_MAXPLAYERS];
+static float g_flTagsAirblastCooldown[MAXPLAYERS];
+static float g_flTagsAirblastLastUsed[MAXPLAYERS];
+static FlamethrowerState g_nTagsAirblastState[MAXPLAYERS];
 
 static ArrayList g_aAttrib;	//Arrays of active attribs to be removed later
 
@@ -83,7 +83,7 @@ void Tags_OnThink(int iClient)
 			int iAmmoType = GetEntProp(iSecondary, Prop_Send, "m_iPrimaryAmmoType");
 			if (iAmmoType > -1)
 			{
-				int iAmmo = GetEntProp(iClient, Prop_Send, "m_iAmmo", 4, iAmmoType);
+				int iAmmo = TF2_GetAmmo(iClient, iAmmoType);
 				
 				if (iAmmo == 1)
 				{
@@ -104,11 +104,21 @@ void Tags_OnThink(int iClient)
 			int iHealTarget = GetEntPropEnt(iSecondary, Prop_Send, "m_hHealingTarget");
 			
 			if (iHealTarget > -1 && GetEntProp(iSecondary, Prop_Send, "m_bChargeRelease"))
+			{
 				g_flUberBeforeHealingBuilding[iClient] = 0.0;
+			}
 			else if (iHealTarget > MaxClients)
-				SetEntPropFloat(iSecondary, Prop_Send, "m_flChargeLevel", g_flUberBeforeHealingBuilding[iClient]);
+			{
+				float flChargeLevel = GetEntPropFloat(iSecondary, Prop_Send, "m_flChargeLevel");
+				if (flChargeLevel < g_flUberBeforeHealingBuilding[iClient])
+					g_flUberBeforeHealingBuilding[iClient] = flChargeLevel;
+				else
+					SetEntPropFloat(iSecondary, Prop_Send, "m_flChargeLevel", g_flUberBeforeHealingBuilding[iClient]);
+			}
 			else
+			{
 				g_flUberBeforeHealingBuilding[iClient] = GetEntPropFloat(iSecondary, Prop_Send, "m_flChargeLevel");
+			}
 		}
 	}
 	
@@ -468,7 +478,7 @@ public void Tags_Glow(int iClient, int iTarget, TagsParams tParams)
 	flGlowTime += GetGameTime();
 	
 	SaxtonHaleBase boss = SaxtonHaleBase(iTarget);
-	if (boss.flGlowTime < flGlowTime)
+	if (boss.flGlowTime != -1.0 && boss.flGlowTime < flGlowTime)
 		boss.flGlowTime = flGlowTime;
 }
 
@@ -729,13 +739,13 @@ public void Tags_AddAmmo(int iClient, int iTarget, TagsParams tParams)
 		if (TF2_GetItemInSlot(iClient, iSlot) == iTarget)
 		{
 			//Slot found
-			int iAmmo = tParams.GetInt("amount") + GetEntProp(iClient, Prop_Send, "m_iAmmo", 4, iAmmoType);	//Primary weapon ammo
+			int iAmmo = tParams.GetInt("amount") + TF2_GetAmmo(iClient, iAmmoType);	//Primary weapon ammo
 			
 			int iMaxAmmo;
 			if (tParams.GetIntEx("max", iMaxAmmo) && iAmmo > iMaxAmmo)
 				iAmmo = iMaxAmmo;
 			
-			SetEntProp(iClient, Prop_Send, "m_iAmmo", iAmmo, 4, iAmmoType);
+			TF2_SetAmmo(iClient, iAmmoType, iAmmo);
 			return;
 		}
 	}
@@ -896,6 +906,16 @@ public void Tags_IgnitePlayer(int iClient, int iTarget, TagsParams tParams)
 	TF2_IgnitePlayer(iTarget, iClient, tParams.GetFloat("duration"));
 }
 
+public void Tags_DelayNextAttack(int iClient, int iTarget, TagsParams tParams)
+{
+	if (iTarget <= 0 || !IsValidEdict(iTarget))
+		return;
+	
+	float flTime = GetGameTime() + tParams.GetFloat("seconds");
+	
+	SetEntPropFloat(iTarget, Prop_Send, "m_flNextPrimaryAttack", flTime);
+	SetEntPropFloat(iTarget, Prop_Send, "m_flNextSecondaryAttack", flTime);
+}
 //---------------------------
 
 public void Frame_AreaOfRange(DataPack data)

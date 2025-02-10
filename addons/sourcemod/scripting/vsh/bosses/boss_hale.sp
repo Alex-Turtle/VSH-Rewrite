@@ -1,11 +1,18 @@
-#define HALE_MODEL "models/player/saxton_hale_jungle_inferno/saxton_hale.mdl"
+#define HALE_MODEL "models/player/saxton_hale_jungle_inferno/saxton_hale_3.mdl"
+
+static bool g_bHaleSpeedRage[MAXPLAYERS];
 
 static char g_strHaleRoundStart[][] = {
 	"vsh_rewrite/saxton_hale/saxton_hale_responce_start1.mp3",
 	"vsh_rewrite/saxton_hale/saxton_hale_responce_start2.mp3",
 	"vsh_rewrite/saxton_hale/saxton_hale_responce_start3.mp3",
 	"vsh_rewrite/saxton_hale/saxton_hale_responce_start4.mp3",
-	"vsh_rewrite/saxton_hale/saxton_hale_responce_start5.mp3"
+	"vsh_rewrite/saxton_hale/saxton_hale_responce_start5.mp3",
+	"vsh_rewrite/saxton_hale/saxton_hale_132_start_1.mp3",
+	"vsh_rewrite/saxton_hale/saxton_hale_132_start_2.mp3",
+	"vsh_rewrite/saxton_hale/saxton_hale_132_start_3.mp3",
+	"vsh_rewrite/saxton_hale/saxton_hale_132_start_4.mp3",
+	"vsh_rewrite/saxton_hale/saxton_hale_132_start_5.mp3"
 };
 
 static char g_strHaleWin[][] = {
@@ -21,9 +28,12 @@ static char g_strHaleLose[][] = {
 
 static char g_strHaleRage[][] = {
 	"vsh_rewrite/saxton_hale/saxton_hale_responce_rage1.mp3",
-	"vsh_rewrite/saxton_hale/saxton_hale_responce_rage2.mp3",
 	"vsh_rewrite/saxton_hale/saxton_hale_responce_rage3.mp3",
 	"vsh_rewrite/saxton_hale/saxton_hale_responce_rage4.mp3"
+};
+
+static char g_strHaleLunge[][] = {
+	"vsh_rewrite/saxton_hale/saxton_hale_responce_rage2.mp3",
 };
 
 static char g_strHaleJump[][] = {
@@ -31,6 +41,16 @@ static char g_strHaleJump[][] = {
 	"vsh_rewrite/saxton_hale/saxton_hale_responce_jump2.mp3",
 	"vsh_rewrite/saxton_hale/saxton_hale_132_jump_1.mp3",
 	"vsh_rewrite/saxton_hale/saxton_hale_132_jump_2.mp3"
+};
+
+static char g_strHaleKill[][] = {
+	"vsh_rewrite/saxton_hale/saxton_hale_responce_spree1.mp3",
+	"vsh_rewrite/saxton_hale/saxton_hale_responce_spree2.mp3",
+	"vsh_rewrite/saxton_hale/saxton_hale_responce_spree3.mp3",
+	"vsh_rewrite/saxton_hale/saxton_hale_responce_spree4.mp3",
+	"vsh_rewrite/saxton_hale/saxton_hale_responce_spree5.mp3",
+	"vsh_rewrite/saxton_hale/saxton_hale_132_kspree_1.mp3",
+	"vsh_rewrite/saxton_hale/saxton_hale_132_kspree_2.mp3"
 };
 
 static char g_strHaleKillScout[][] = {
@@ -98,10 +118,21 @@ static char g_strHaleBackStabbed[][] = {
 
 public void SaxtonHale_Create(SaxtonHaleBase boss)
 {
-	boss.CreateClass("WeaponFists");
 	boss.CreateClass("BraveJump");
-	boss.CreateClass("ScareRage");
-	boss.SetPropFloat("ScareRage", "Radius", 800.0);
+
+	boss.CreateClass("RageAttributes");
+	boss.SetPropFloat("RageAttributes", "RageAttribDuration", 5.0);
+	boss.SetPropFloat("RageAttributes", "RageAttribSuperRageMultiplier", 2.0);
+	RageAttributes_AddAttrib(boss, 6, 0.3, 0.3, false);		// Increased attack speed (+70%)
+
+	boss.CreateClass("RageAddCond");
+	boss.SetPropFloat("RageAddCond", "RageCondDuration", 5.0);
+	boss.SetPropFloat("RageAddCond", "RageCondSuperRageMultiplier", 2.0);
+	RageAddCond_AddCond(boss, TFCond_SpeedBuffAlly);	// Speed boost effect
+	RageAddCond_AddCond(boss, TFCond_MegaHeal);			// Knockback & stun immunity
+	RageAddCond_AddCond(boss, TFCond_DefenseBuffed);	// Battalion's Resistance
+
+	boss.CreateClass("Lunge");
 	
 	boss.iHealthPerPlayer = 600;
 	boss.flHealthExponential = 1.05;
@@ -120,11 +151,14 @@ public void SaxtonHale_GetBossInfo(SaxtonHaleBase boss, char[] sInfo, int length
 	StrCat(sInfo, length, "\n ");
 	StrCat(sInfo, length, "\nAbilities");
 	StrCat(sInfo, length, "\n- Brave Jump");
+	StrCat(sInfo, length, "\n- Lunge, reload to use");
 	StrCat(sInfo, length, "\n ");
 	StrCat(sInfo, length, "\nRage");
 	StrCat(sInfo, length, "\n- Damage requirement: 2500");
-	StrCat(sInfo, length, "\n- Scares players at medium range for 5 seconds");
-	StrCat(sInfo, length, "\n- 200%% Rage: Longer range and extends duration to 7.5 seconds");
+	StrCat(sInfo, length, "\n- Faster attack and movement speed");
+	StrCat(sInfo, length, "\n- Knockback and stun immunity");
+	StrCat(sInfo, length, "\n- Damage resistance and crits immunity");
+	StrCat(sInfo, length, "\n- 200%% Rage: Extends duration from 5 to 10 seconds");
 }
 
 public void SaxtonHale_OnSpawn(SaxtonHaleBase boss)
@@ -142,6 +176,48 @@ public void SaxtonHale_OnSpawn(SaxtonHaleBase boss)
 	259: Deals 3x falling damage to the player you land on
 	214: kill_eater
 	*/
+}
+
+public void SaxtonHale_OnRage(SaxtonHaleBase boss)
+{
+	if (!g_bHaleSpeedRage[boss.iClient])
+	{
+		boss.flSpeed *= 1.3;
+		g_bHaleSpeedRage[boss.iClient] = true;
+	}
+}
+
+public void SaxtonHale_OnThink(SaxtonHaleBase boss)
+{
+	if (g_bHaleSpeedRage[boss.iClient] && boss.flRageLastTime < GetGameTime() - (boss.bSuperRage ? 8.0 : 5.0))
+	{
+		g_bHaleSpeedRage[boss.iClient] = false;
+		boss.flSpeed /= 1.3;
+	}
+}
+
+public void SaxtonHale_OnPlayerKilled(SaxtonHaleBase boss, Event event, int iVictim)
+{
+	KillIconShared(boss, event, true);
+}
+
+public void SaxtonHale_OnDestroyObject(SaxtonHaleBase boss, Event event)
+{
+	KillIconShared(boss, event, false);
+}
+
+static void KillIconShared(SaxtonHaleBase boss, Event event, bool bLog)
+{
+	int iWeaponId = event.GetInt("weaponid");
+	
+	if (iWeaponId == TF_WEAPON_SHOVEL || iWeaponId == TF_WEAPON_BOTTLE)
+	{
+		if (bLog)
+			event.SetString("weapon_logclassname", g_bHaleSpeedRage[boss.iClient] ? "berserk" : "fists");
+		
+		event.SetString("weapon", g_bHaleSpeedRage[boss.iClient] ? "vehicle" : "fists");
+		event.SetInt("weaponid", TF_WEAPON_FISTS);
+	}
 }
 
 public void SaxtonHale_GetModel(SaxtonHaleBase boss, char[] sModel, int length)
@@ -167,21 +243,30 @@ public void SaxtonHale_GetSoundAbility(SaxtonHaleBase boss, char[] sSound, int l
 {
 	if (strcmp(sType, "BraveJump") == 0)
 		strcopy(sSound, length, g_strHaleJump[GetRandomInt(0,sizeof(g_strHaleJump)-1)]);
+	
+	if (strcmp(sType, "Lunge") == 0)
+		strcopy(sSound, length, g_strHaleLunge[GetRandomInt(0,sizeof(g_strHaleLunge)-1)]);
 }
 
 public void SaxtonHale_GetSoundKill(SaxtonHaleBase boss, char[] sSound, int length, TFClassType nClass)
 {
-	switch (nClass)
+	if (!GetRandomInt(0, 1) || nClass == TFClass_Soldier)
 	{
-		case TFClass_Scout: strcopy(sSound, length, g_strHaleKillScout[GetRandomInt(0,sizeof(g_strHaleKillScout)-1)]);
-		//case TFClass_Soldier: strcopy(sSound, length, g_strHaleKillSoldier[GetRandomInt(0,sizeof(g_strHaleKillSoldier)-1)]);
-		case TFClass_Pyro: strcopy(sSound, length, g_strHaleKillPyro[GetRandomInt(0,sizeof(g_strHaleKillPyro)-1)]);
-		case TFClass_DemoMan: strcopy(sSound, length, g_strHaleKillDemoman[GetRandomInt(0,sizeof(g_strHaleKillDemoman)-1)]);
-		case TFClass_Heavy: strcopy(sSound, length, g_strHaleKillHeavy[GetRandomInt(0,sizeof(g_strHaleKillHeavy)-1)]);
-		case TFClass_Engineer: strcopy(sSound, length, g_strHaleKillEngineer[GetRandomInt(0,sizeof(g_strHaleKillEngineer)-1)]);
-		case TFClass_Medic: strcopy(sSound, length, g_strHaleKillMedic[GetRandomInt(0,sizeof(g_strHaleKillMedic)-1)]);
-		case TFClass_Sniper: strcopy(sSound, length, g_strHaleKillSniper[GetRandomInt(0,sizeof(g_strHaleKillSniper)-1)]);
-		case TFClass_Spy: strcopy(sSound, length, g_strHaleKillSpy[GetRandomInt(0,sizeof(g_strHaleKillSpy)-1)]);
+		strcopy(sSound, length, g_strHaleKill[GetRandomInt(0,sizeof(g_strHaleKill)-1)]);
+	}
+	else
+	{
+		switch (nClass)
+		{
+			case TFClass_Scout: strcopy(sSound, length, g_strHaleKillScout[GetRandomInt(0,sizeof(g_strHaleKillScout)-1)]);
+			case TFClass_Pyro: strcopy(sSound, length, g_strHaleKillPyro[GetRandomInt(0,sizeof(g_strHaleKillPyro)-1)]);
+			case TFClass_DemoMan: strcopy(sSound, length, g_strHaleKillDemoman[GetRandomInt(0,sizeof(g_strHaleKillDemoman)-1)]);
+			case TFClass_Heavy: strcopy(sSound, length, g_strHaleKillHeavy[GetRandomInt(0,sizeof(g_strHaleKillHeavy)-1)]);
+			case TFClass_Engineer: strcopy(sSound, length, g_strHaleKillEngineer[GetRandomInt(0,sizeof(g_strHaleKillEngineer)-1)]);
+			case TFClass_Medic: strcopy(sSound, length, g_strHaleKillMedic[GetRandomInt(0,sizeof(g_strHaleKillMedic)-1)]);
+			case TFClass_Sniper: strcopy(sSound, length, g_strHaleKillSniper[GetRandomInt(0,sizeof(g_strHaleKillSniper)-1)]);
+			case TFClass_Spy: strcopy(sSound, length, g_strHaleKillSpy[GetRandomInt(0,sizeof(g_strHaleKillSpy)-1)]);
+		}
 	}
 }
 
@@ -199,7 +284,9 @@ public void SaxtonHale_Precache(SaxtonHaleBase boss)
 	for (int i = 0; i < sizeof(g_strHaleWin); i++) PrepareSound(g_strHaleWin[i]);
 	for (int i = 0; i < sizeof(g_strHaleLose); i++) PrepareSound(g_strHaleLose[i]);
 	for (int i = 0; i < sizeof(g_strHaleRage); i++) PrepareSound(g_strHaleRage[i]);
+	for (int i = 0; i < sizeof(g_strHaleLunge); i++) PrepareSound(g_strHaleLunge[i]);
 	for (int i = 0; i < sizeof(g_strHaleJump); i++) PrepareSound(g_strHaleJump[i]);
+	for (int i = 0; i < sizeof(g_strHaleKill); i++) PrepareSound(g_strHaleKill[i]);
 	for (int i = 0; i < sizeof(g_strHaleKillScout); i++) PrepareSound(g_strHaleKillScout[i]);
 	//for (int i = 0; i < sizeof(g_strHaleKillSoldier); i++) PrepareSound(g_strHaleKillSoldier[i]);
 	for (int i = 0; i < sizeof(g_strHaleKillPyro); i++) PrepareSound(g_strHaleKillPyro[i]);
@@ -246,11 +333,10 @@ public void SaxtonHale_Precache(SaxtonHaleBase boss)
 	AddFileToDownloadsTable("materials/models/player/hwm_saxton_hale/shades/inv.vmt");
 	AddFileToDownloadsTable("materials/models/player/hwm_saxton_hale/shades/null.vtf");
 	
-	AddFileToDownloadsTable("models/player/saxton_hale_jungle_inferno/saxton_hale.mdl");
-	AddFileToDownloadsTable("models/player/saxton_hale_jungle_inferno/saxton_hale.phy");
-	AddFileToDownloadsTable("models/player/saxton_hale_jungle_inferno/saxton_hale.sw.vtx");
-	AddFileToDownloadsTable("models/player/saxton_hale_jungle_inferno/saxton_hale.vvd");
-	AddFileToDownloadsTable("models/player/saxton_hale_jungle_inferno/saxton_hale.dx80.vtx");
-	AddFileToDownloadsTable("models/player/saxton_hale_jungle_inferno/saxton_hale.dx90.vtx");
+	AddFileToDownloadsTable("models/player/saxton_hale_jungle_inferno/saxton_hale_3.mdl");
+	AddFileToDownloadsTable("models/player/saxton_hale_jungle_inferno/saxton_hale_3.phy");
+	AddFileToDownloadsTable("models/player/saxton_hale_jungle_inferno/saxton_hale_3.vvd");
+	AddFileToDownloadsTable("models/player/saxton_hale_jungle_inferno/saxton_hale_3.dx80.vtx");
+	AddFileToDownloadsTable("models/player/saxton_hale_jungle_inferno/saxton_hale_3.dx90.vtx");
 }
 

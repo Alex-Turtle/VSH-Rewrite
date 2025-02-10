@@ -3,7 +3,7 @@
 #define ICE_RANGE 250.0
 
 static bool g_bIceRagdoll;
-static float g_flClientIceSlowdown[TF_MAXPLAYERS];
+static float g_flClientIceSlowdown[MAXPLAYERS];
 
 public void ModifiersIce_Create(SaxtonHaleBase boss)
 {
@@ -28,6 +28,18 @@ public void ModifiersIce_GetRenderColor(SaxtonHaleBase boss, int iColor[4])
 	iColor[1] = 176;
 	iColor[2] = 255;
 	iColor[3] = 255;
+}
+
+public void ModifiersIce_GetParticleEffect(SaxtonHaleBase boss, int index, char[] sEffect, int length)
+{
+	switch (index)
+	{
+		case 0:
+			strcopy(sEffect, length, "utaunt_ice_bodyglow");
+		
+		case 1, 2, 3, 4, 5:
+			strcopy(sEffect, length, "utaunt_festivelights_blue_lights1");
+	}
 }
 
 public void ModifiersIce_OnDeath(SaxtonHaleBase boss, Event event)
